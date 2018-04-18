@@ -1,0 +1,555 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM 222222222222222    
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M:::::::M             M:::::::M2:::::::::::::::22  
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::::M           M::::::::M2::::::222222:::::2 
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OM:::::::::M         M:::::::::M2222222     2:::::2 
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::::::M       M::::::::::M            2:::::2 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM:::::::::::M     M:::::::::::M            2:::::2 
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM:::::::M::::M   M::::M:::::::M         2222::::2  
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M M::::M M::::M M::::::M    22222::::::22   
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M  M::::M::::M  M::::::M  22::::::::222     
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM::::::M   M:::::::M   M::::::M 2:::::22222        
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM::::::M    M:::::M    M::::::M2:::::2             
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::M     MMMMM     M::::::M2:::::2             
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::OM::::::M               M::::::M2:::::2       222222
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::M               M::::::M2::::::2222222:::::2
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M::::::M               M::::::M2::::::::::::::::::2
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM22222222222222222222
+--  
+--  DaDam's Engine Of Multiplayer 2 (DEOM2) A 2d starfall multiplayer engine
+
+--------------------
+
+DEOM = {}
+DEOM.libData = "2.0"
+DEOM.requests = {}
+DEOM.data = {}
+DEOM.streams = {}
+DEOM.streamRequests = {}
+DEOM.streamSendBuffer = nil
+DEOM.blacklist = {}--{["STEAM_0:0:51440232"] = true, ["STEAM_0:1:18168563"] = true}
+
+--------------------
+
+local net = net
+
+if SERVER then
+    hook.add("net", "DEOM_RECEIVE", function(name, len, ply)
+        if DEOM.blacklist[ply:getSteamID()] then return end
+        
+        if DEOM.requests[name] then
+            local rtn = DEOM.requests[name].func(ply)
+            
+            net.start(name)
+            
+            if type(rtn) == "table" then
+                net.writeString("t")
+                net.writeString(json.encode(rtn))
+            elseif type(rtn) == "string" then
+                net.writeString("s")
+                net.writeString(rtn)
+            elseif type(rtn) == "number" then
+                net.writeString("n")
+                net.writeInt(rtn, 32)
+            elseif type(rtn) == "boolean" then
+                net.writeString("b")
+                net.writeBit(rtn)
+            elseif type(rtn) == "Color" then
+                net.writeString("c")
+                net.writeColor(rtn)
+            elseif type(rtn) == "Angle" then
+                net.writeString("a")
+                net.writeAngle(rtn)
+            elseif type(rtn) == "Vector" then
+                net.writeString("v")
+                net.writeVector(rtn)
+            elseif type(rtn) == "Entity" or type(rtn) == "Player" then
+                net.writeString("e")
+                net.writeEntity(rtn)
+            end
+            
+            local pl = ply
+            
+            if DEOM.requests[name].ply then
+                pl = nil
+            end
+            
+            net.send(pl, DEOM.requests[name].fast)
+        elseif DEOM.streamRequests[name] then
+            local rtn = DEOM.streamRequests[name].func()
+            
+            net.start(name)
+            
+            if type(rtn) == "table" then
+                net.writeString("t")
+                net.writeStream(json.encode(rtn))
+            elseif type(rtn) == "string" then
+                net.writeString("s")
+                net.writeStream(rtn)
+            end
+            
+            local pl = ply
+            
+            if DEOM.streamRequests[name].ply then
+                pl = nil
+            end
+            
+            net.send(pl)
+        elseif DEOM.data[name] then
+            local rtn
+            local typ = net.readString()
+            
+            if typ == "t" then
+                rtn = von.deserialize(net.readString())
+            elseif typ == "s" then
+                rtn = net.readString()
+            elseif typ == "n" then
+                rtn = net.readInt(32)
+            elseif typ == "b" then
+                rtn = net.readBit() == 1
+            elseif typ == "c" then
+                rtn = net.readColor()
+            elseif typ == "a" then
+                rtn = net.readAngle()
+            elseif typ == "v" then
+                rtn = net.readVector()
+            elseif typ == "e" then
+                rtn = net.readEntity()
+            end
+            
+            DEOM.data[name](rtn, ply)
+        elseif DEOM.streams[name] then
+            if not DEOM.streams[name].data then
+                DEOM.streams[name].data = ""
+                DEOM.streams[name].length = net.readInt(8)
+                DEOM.streams[name].typ = net.readString()
+                DEOM.streams[name].cur = 0
+            end
+            
+            DEOM.streams[name].cur = DEOM.streams[name].cur + 1
+            DEOM.streams[name].data = DEOM.streams[name].data .. net.readString()
+            
+            if DEOM.streams[name].cur == DEOM.streams[name].length then
+                local data = DEOM.streams[name].data
+                
+                if DEOM.streams[name].typ == "t" then
+                    data = json.decode(data)
+                end
+                
+                DEOM.streams[name].callback(data, ply)
+                DEOM.streams[name] = {
+                    callback = DEOM.streams[name].callback
+                }
+            end
+            
+            --[[local typ = net.readString()
+            
+            if typ == "t" then
+                net.readStream(function(data) DEOM.streams[name](json.decode(data), ply) end)
+            elseif typ == "s" then
+                net.readStream(function(data) DEOM.streams[name](data, ply) end)
+            end]]
+        end
+    end)
+    
+    function DEOM.requestReceive(name, callback, ply, fast)
+        name = "deom_request_" .. name
+        
+        DEOM.requests[name] = {
+            func = callback,
+            fast = fast,
+            ply = ply
+        }
+    end
+    
+    function DEOM.streamRequestReceive(name, callback, ply)
+        name = "deom_streamrequest_" .. name
+        
+        DEOM.streamRequests[name] = {
+            func = callback,
+            ply = ply
+        }
+    end
+    
+    function DEOM.dataReceive(name, callback)
+        name = "deom_data_" .. name
+        
+        DEOM.data[name] = callback
+    end
+    
+    function DEOM.sendData(name, data, ply, fast)
+        name = "deom_data_" .. name
+        
+        net.start(name)
+        
+        if type(data) == "table" then
+            net.writeString("t")
+            net.writeString(von.serialize(data))
+        elseif type(data) == "string" then
+            net.writeString("s")
+            net.writeString(data)
+        elseif type(data) == "number" then
+            net.writeString("n")
+            net.writeInt(data, 32)
+        elseif type(data) == "boolean" then
+            net.writeString("b")
+            net.writeBit(data)
+        elseif type(data) == "Color" then
+            net.writeString("c")
+            net.writeColor(data)
+        elseif type(data) == "Angle" then
+            net.writeString("a")
+            net.writeAngle(data)
+        elseif type(data) == "Vector" then
+            net.writeString("v")
+            net.writeVector(data)
+        elseif type(data) == "Entity" or type(data) == "Player" then
+            net.writeString("e")
+            net.writeEntity(data)
+        end
+        
+        net.send(ply, fast)
+        
+        --print(net.getBytesLeft())
+    end
+    
+    function DEOM.streamReceive(name, callback)
+        name = "deom_stream_" .. name
+        
+        DEOM.streams[name] = {
+            callback = callback
+        }
+    end
+    
+    function DEOM.sendStream(name, data, ply)
+        name = "deom_stream_" .. name
+        
+        if DEOM.streamSendBuffer then
+            error("DEOM2: tried to stream while a stream was already sending")
+        else
+            DEOM.streamSendBuffer = {
+                data = {},
+                name = name,
+                ply = ply,
+                typ = "s",
+                length = 0,
+                sendfirst = true
+            }
+            
+            if type(data) == "table" then
+                DEOM.streamSendBuffer.typ = "t"
+                data = json.encode(data)
+            end
+            --net.getBytesLeft()
+            local i = 0
+            
+            while i < #data do
+                local str = string.sub(data, i + 1, i + 5000)
+                
+                DEOM.streamSendBuffer.length = DEOM.streamSendBuffer.length + 1
+                DEOM.streamSendBuffer.data[DEOM.streamSendBuffer.length] = str
+                
+                i = i + #str
+            end
+            
+            local function sendChunk()
+                if net.getBytesLeft() > 5500 then
+                    net.start(DEOM.streamSendBuffer.name)
+                    
+                    if DEOM.streamSendBuffer.sendfirst then
+                        net.writeInt(DEOM.streamSendBuffer.length, 8)
+                        net.writeString(DEOM.streamSendBuffer.typ)
+                        
+                        DEOM.streamSendBuffer.sendfirst = false
+                    end
+                    
+                    net.writeString(DEOM.streamSendBuffer.data[1])
+                    net.send(DEOM.streamSendBuffer.ply)
+                    
+                    
+                    table.remove(DEOM.streamSendBuffer.data, 1)
+                    
+                    if #DEOM.streamSendBuffer.data > 0 then
+                        timer.simple(0.1, function()
+                            sendChunk()
+                        end)
+                    else
+                        DEOM.streamSendBuffer = nil
+                    end
+                else
+                    timer.simple(0.1, function()
+                        sendChunk()
+                    end)
+                end
+            end
+            
+            sendChunk()
+        end
+        
+        --[[net.start(name)
+        
+        if type(data) == "table" then
+            net.writeString("t")
+            net.writeStream(json.encode(data))
+        elseif type(data) == "string" then
+            net.writeString("s")
+            net.writeStream(data)
+        end
+        
+        net.send(ply)]]
+    end
+end
+
+--------------------
+
+if CLIENT then
+    hook.add("net", "DEOM_RECEIVE", function(name, len, ply)
+        if DEOM.requests[name] then
+            local rtn
+            local typ = net.readString()
+            
+            if typ == "t" then
+                rtn = json.decode(net.readString())
+            elseif typ == "s" then
+                rtn = net.readString()
+            elseif typ == "n" then
+                rtn = net.readInt(32)
+            elseif typ == "b" then
+                rtn = net.readBit() == 1
+            elseif typ == "c" then
+                rtn = net.readColor()
+            elseif typ == "a" then
+                rtn = net.readAngle()
+            elseif typ == "v" then
+                rtn = net.readVector()
+            elseif typ == "e" then
+                rtn = net.readEntity()
+            end
+            
+            DEOM.requests[name](rtn)
+            
+            DEOM.requests[name] = nil
+        elseif DEOM.streamRequests[name] then
+            local typ = net.readString()
+            
+            if typ == "t" then
+                net.readStream(function(data)
+                    DEOM.streamRequests[name](json.decode(data))
+                    
+                    DEOM.streamRequests[name] = nil
+                end)
+            elseif typ == "s" then
+                net.readStream(function(data)
+                    DEOM.streamRequests[name](data)
+                    
+                    DEOM.streamRequests[name] = nil
+                end)
+            end
+        elseif DEOM.data[name] then
+            local rtn
+            local typ = net.readString()
+            
+            if typ == "t" then
+                rtn = von.deserialize(net.readString()) --von.deserialize(net.readString())
+            elseif typ == "s" then
+                rtn = net.readString()
+            elseif typ == "n" then
+                rtn = net.readInt(32)
+            elseif typ == "b" then
+                rtn = net.readBit() == 1
+            elseif typ == "c" then
+                rtn = net.readColor()
+            elseif typ == "a" then
+                rtn = net.readAngle()
+            elseif typ == "v" then
+                rtn = net.readVector()
+            elseif typ == "e" then
+                rtn = net.readEntity()
+            end
+            
+            DEOM.data[name](rtn)
+        elseif DEOM.streams[name] then
+            if not DEOM.streams[name].data then
+                DEOM.streams[name].data = ""
+                DEOM.streams[name].length = net.readInt(8)
+                DEOM.streams[name].typ = net.readString()
+                DEOM.streams[name].cur = 0
+            end
+            
+            DEOM.streams[name].cur = DEOM.streams[name].cur + 1
+            DEOM.streams[name].data = DEOM.streams[name].data .. net.readString()
+            
+            if DEOM.streams[name].cur == DEOM.streams[name].length then
+                local data = DEOM.streams[name].data
+                
+                if DEOM.streams[name].typ == "t" then
+                    data = json.decode(data)
+                end
+                
+                DEOM.streams[name].callback(data)
+                DEOM.streams[name] = {
+                    callback = DEOM.streams[name].callback
+                }
+            end
+            
+            --[[local typ = net.readString()
+            
+            if typ == "t" then
+                net.readStream(function(data) DEOM.streams[name](json.decode(data)) end)
+            elseif typ == "s" then
+                net.readStream(function(data) DEOM.streams[name](data) end)
+            end]]
+        end
+    end)
+    
+    function DEOM.makeRequest(name, callback, fast)
+        name = "deom_request_" .. name
+        
+        net.start(name)
+        net.send(nil, fast)
+        
+        DEOM.requests[name] = callback
+    end
+    
+    function DEOM.makeStreamRequest(name, callback)
+        name = "deom_streamrequest_" .. name
+        
+        net.start(name)
+        net.send()
+        
+        DEOM.streamRequests[name] = callback
+    end
+    
+    function DEOM.dataReceive(name, callback)
+        name = "deom_data_" .. name
+        
+        DEOM.data[name] = callback
+    end
+    
+    function DEOM.sendData(name, data, fast)
+        name = "deom_data_" .. name
+        
+        net.start(name)
+        
+        if type(data) == "table" then
+            net.writeString("t")
+            net.writeString(von.serialize(data))
+        elseif type(data) == "string" then
+            net.writeString("s")
+            net.writeString(data)
+        elseif type(data) == "number" then
+            net.writeString("n")
+            net.writeInt(data, 32)
+        elseif type(data) == "boolean" then
+            net.writeString("b")
+            net.writeBit(data)
+        elseif type(data) == "Color" then
+            net.writeString("c")
+            net.writeColor(data)
+        elseif type(data) == "Angle" then
+            net.writeString("a")
+            net.writeAngle(data)
+        elseif type(data) == "Vector" then
+            net.writeString("v")
+            net.writeVector(data)
+        elseif type(data) == "Entity" or type(data) == "Player" then
+            net.writeString("e")
+            net.writeEntity(data)
+        end
+        
+        net.send(nil, fast)
+    end
+    
+    function DEOM.streamReceive(name, callback)
+        name = "deom_stream_" .. name
+        
+        DEOM.streams[name] = {
+            callback = callback
+        }
+    end
+    
+    function DEOM.sendStream(name, data)
+        name = "deom_stream_" .. name
+        
+        if DEOM.streamSendBuffer then
+            error("DEOM2: tried to stream while a stream was already sending")
+        else
+            DEOM.streamSendBuffer = {
+                data = {},
+                name = name,
+                ply = ply,
+                typ = "s",
+                length = 0,
+                sendfirst = true
+            }
+            
+            if type(data) == "table" then
+                DEOM.streamSendBuffer.typ = "t"
+                data = json.encode(data)
+            end
+            --net.getBytesLeft()
+            local i = 0
+            
+            while i < #data do
+                local str = string.sub(data, i + 1, i + 5000)
+                
+                DEOM.streamSendBuffer.length = DEOM.streamSendBuffer.length + 1
+                DEOM.streamSendBuffer.data[DEOM.streamSendBuffer.length] = str
+                
+                i = i + #str
+            end
+            
+            local function sendChunk()
+                if net.getBytesLeft() > 5500 then
+                    net.start(DEOM.streamSendBuffer.name)
+                    
+                    if DEOM.streamSendBuffer.sendfirst then
+                        net.writeInt(DEOM.streamSendBuffer.length, 8)
+                        net.writeString(DEOM.streamSendBuffer.typ)
+                        
+                        DEOM.streamSendBuffer.sendfirst = false
+                    end
+                    
+                    net.writeString(DEOM.streamSendBuffer.data[1])
+                    net.send(DEOM.streamSendBuffer.ply)
+                    
+                    
+                    table.remove(DEOM.streamSendBuffer.data, 1)
+                    
+                    if #DEOM.streamSendBuffer.data > 0 then
+                        timer.simple(0.1, function()
+                            sendChunk()
+                        end)
+                    else
+                        DEOM.streamSendBuffer = nil
+                    end
+                else
+                    timer.simple(0.1, function()
+                        sendChunk()
+                    end)
+                end
+            end
+            
+            sendChunk()
+        end
+        
+        --[[net.start(name)
+        
+        if type(data) == "table" then
+            net.writeString("t")
+            net.writeStream(json.encode(data))
+        elseif type(data) == "string" then
+            net.writeString("s")
+            net.writeStream(data)
+        end
+        
+        net.send()]]
+    end
+end
+
+return DEOM
+
+
+
+
+
+

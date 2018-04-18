@@ -1,0 +1,113 @@
+--@include libs/DEOM2.txt
+--@include libs/Permission.txt
+
+local youtube = {}
+local net = require("libs/DEOM2.txt")
+local perm = require("libs/Permission.txt")
+
+--------------------
+
+if SERVER then
+    local onSuccessSearch
+    local onSuccessDownload
+    local onFailDownload
+    
+    function youtube.search(search, terms, onSuccess)
+        net.sendData("YOUTUBE_SEARCH", {search = search, terms = terms})
+        
+        onSuccessSearch = onSuccess
+    end
+    
+    function youtube.getDownload(id, quality, onSuccess, onFail)
+        net.sendData("YOUTUBE_DOWNLOAD", {id = id, quality = quality})
+        
+        onSuccessDownload = onSuccess
+        onFailDownload = onFail
+    end
+    
+    -----
+    
+    net.dataReceive("YOUTUBE_SEARCH", function(data, ply)
+        if not perm.hasPermission(ply) then return end
+        
+        onSuccessSearch(data)
+    end)
+    
+    net.dataReceive("YOUTUBE_DOWNLOAD", function(data, ply)
+        if not perm.hasPermission(ply) then return end
+        
+        if data.result then
+            onSuccessDownload(data.result)
+        elseif data.err then
+            onFailDownload(data.err)
+        end
+    end)
+    
+elseif player() == owner() then
+    youtube.key = nil
+    
+    function youtube.search(search, terms, onSuccess)
+        if youtube.key == nil then error("Tried to search on youtube without an apikey") end
+        
+        local add = ""
+        for k, v in pairs(terms) do
+            add = add .. k .. "=" .. v .. "&"
+        end --maxResults=4&type=video&order=viewCount&
+        
+        http.get("https://www.googleapis.com/youtube/v3/search?part=snippet&q=" .. string.replace(search, " ", "%20") .. "&" .. add .. "key=" .. youtube.key, function(body)
+            local data = json.decode(body)
+            
+            if data.error then error("Tried to search on youtube without an valid apikey") end
+            
+            onSuccess(data)
+        end, function()
+            
+        end)
+	    
+    end
+    
+    function youtube.getDownload(id, quality, onSuccess, onFail)
+        if not http.canRequest() then onFail("Can't request new http yet") return end
+        
+        http.get("https://youtubetoany.com/@api/json/mp3/" .. id, function(body)
+            local data = json.decode(string.sub(body, 1, (string.find(body, "<script") or #body + 1) - 1))
+            
+            if not data then onFail("API returned no valid data") return end
+            if data.error then onFail(data.error) return end
+            
+            onSuccess("https:" .. data.vidInfo[math.clamp(quality, 0, table.count(data.vidInfo) - 1)].dloadUrl)
+        end, function(err)
+            onFail(err)
+        end)
+        --[[http.get("https://download.tubemp3convert.com/@api/json/mp3/" .. id, function(body)
+            local data = json.decode(body)
+            
+            if data.error then return end
+            
+            onSuccess("http:" .. data.vidInfo[math.clamp(quality, 0, table.count(data.vidInfo) - 1)].dloadUrl)
+        end, function()
+            
+        end)]]
+    end
+    
+    -----
+    
+    net.dataReceive("YOUTUBE_SEARCH", function(data)
+        youtube.search(data.search, data.terms, function(result)
+            net.sendData("YOUTUBE_SEARCH", result)
+        end)
+    end)
+    
+    net.dataReceive("YOUTUBE_DOWNLOAD", function(data)
+        youtube.getDownload(data.id, data.quality, function(result)
+            net.sendData("YOUTUBE_DOWNLOAD", {result = result})
+        end, function(err)
+            net.sendData("YOUTUBE_DOWNLOAD", {err = err})
+        end)
+    end)
+    
+end
+
+--------------------
+
+return youtube

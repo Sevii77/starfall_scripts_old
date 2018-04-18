@@ -1,0 +1,58 @@
+local brainfuck = {}
+
+function brainfuck.run(code)
+    local cells = {}
+    local cell = 0
+    local comp = ""
+    
+    function g()
+    	return cells[cell] or 0
+    end
+    
+    function s(a)
+    	cells[cell] = a
+    end
+    
+    function n()
+    	cell = cell + 1
+    end
+    
+    function p()
+    	cell = cell - 1
+    end
+    
+    comp = comp .. "local output = ''"
+    
+    for i, c in pairs(string.split(code, "")) do
+    	if c == "+" then
+    		comp = comp .. "s(g()+1)"
+    	elseif c == "-" then
+    		comp = comp .. "s(g()-1)"
+    	elseif c == ">" then
+    		comp = comp .. "n()"
+    	elseif c == "<" then
+    		comp = comp .. "p()"
+    	elseif c == "." then
+    		comp = comp .. "output=output..string.char(math.max(g()%256, 0))"
+    	elseif c == "," then
+    		comp = comp .. "s(string.byte(output[1]))"
+    	elseif c == "[" then
+    		comp = comp .. "local i=0 while g()>0 do i=i+1 if i>1000 then return false, 'INF LOOP DETECTED' end "
+    	elseif c == "]" then
+    		comp = comp .. "end "
+    	else
+    		--Unassigned
+    	end
+    end
+    
+    comp = comp .. " return true, output"
+    
+    local f = loadstring(comp)
+    if f and type(f) ~= "string" then
+    	return f()
+    end
+    
+    return false, "INVALID CODE"
+end
+
+return brainfuck

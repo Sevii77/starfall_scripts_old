@@ -1,0 +1,165 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M:::::::M             M:::::::M
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::::M           M::::::::M
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OM:::::::::M         M:::::::::M
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::::::M       M::::::::::M
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM:::::::::::M     M:::::::::::M
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM:::::::M::::M   M::::M:::::::M
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M M::::M M::::M M::::::M
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M  M::::M::::M  M::::::M
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM::::::M   M:::::::M   M::::::M
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM::::::M    M:::::M    M::::::M
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::M     MMMMM     M::::::M
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::OM::::::M               M::::::M
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::M               M::::::M
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M::::::M               M::::::M
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM
+--  
+--  DaDam's Engine Of Multiplayer (DEOM) A 2d starfall multiplayer engine
+
+--------------------
+
+DEOM = {}
+DEOM.objects = {}
+
+--------------------
+
+if SERVER then
+    local tickrate = 16
+    
+    hook.add("net", "DEOM_RECEIVE_DATA", function(name, len, ply)
+        if name == "DEOM_DATA_TO_SERVER" then
+            for i = 1, net.readInt(32) do
+                local data = {
+                    name = net.readString(),
+                    pos = net.readVector(),
+                    scale = net.readVector(),
+                    coll = net.readBit() and true or false,
+                    vel = net.readVector()
+                }
+                
+                DEOM.objects[table.count(DEOM.objects) + 1] = data
+            end
+        end
+    end)
+    
+    local oct = timer.curtime()
+    
+    hook.add("Think", "DEOM_TICKRATE_SEND_DATA", function()
+        if timer.curtime() - oct >= 1/tickrate then
+            if table.count(DEOM.objects) > 0 then
+                net.start("DEOM_DATA_TO_CLIENT")
+                net.writeInt(table.count(DEOM.objects), 32)
+                
+                for k, v in pairs(DEOM.objects) do
+                    net.writeString(v.name)
+                    net.writeVector(v.pos)
+                    net.writeVector(v.scale)
+                    net.writeBit(v.coll)
+                    net.writeVector(v.vel)
+                end
+                
+                net.send(nil, true)
+            
+                DEOM.objects = {}
+            end
+            
+            oct = timer.curtime()
+        end
+    end)
+    
+    function DEOM.tickrate(tickrate)
+        if tickrate then
+            tickrate = tickrate
+        else
+            return tickrate
+        end
+    end
+end
+
+--------------------
+
+if CLIENT then
+    DEOM.objectRec = {}
+    DEOM.playerObj = nil
+    DEOM.funcOnRec = nil
+    
+    hook.add("net", "DEOM_RECEIVE_DATA", function (n, len, ply)
+        if n == "DEOM_DATA_TO_CLIENT" then
+            local amount = net.readInt(32)
+            
+            for i = 1, amount do
+                local name = net.readString()
+                local pos = net.readVector()
+                local size = net.readVector()
+                local coll = net.readBit() and true or false
+                local vel = net.readVector()
+                
+                if DEOC.existObject(name) and DEOM.playerObj and name != DEOM.playerObj then
+                    DEOC.objectPos(name, pos)
+                    DEOC.objectSize(name, size)
+                    DEOC.objectCollisions(name, coll)
+                end
+                
+                DEOM.objectRec[name] = {
+                    name = name,
+                    pos = pos,
+                    size = size,
+                    coll = coll,
+                    vel = vel
+                }
+            end
+            
+            if DEOM.funcOnRec then
+                DEOM.funcOnRec()
+            end
+        end
+    end)
+    
+    function DEOM.addObject(name)
+        DEOM.objects[name] = Vector(0, 0, 0)
+    end
+    
+    function DEOM.removeObject(name)
+        DEOM.objects[name] = nil
+    end
+    
+    function DEOM.clearObjects()
+        DEOM.objects = {}
+    end
+    
+    function DEOM.objectVelocity(name, vel)
+        DEOM.objects[name] = vel
+    end
+    
+    function DEOM.clientPlayerObject(name)
+        DEOM.playerObj = name
+    end
+    
+    function DEOM.objectReceivedData()
+        return DEOM.objectRec
+    end
+    
+    function DEOM.onDataReceive(func)
+        DEOM.funcOnRec = func
+    end
+    
+    function DEOM.sendData()
+        if table.count(DEOM.objects) > 0 then
+            net.start("DEOM_DATA_TO_SERVER")
+            net.writeInt(table.count(DEOM.objects), 32)
+            
+            for k, o in pairs(DEOM.objects) do
+                v = DEOC.objects[k]
+                
+                net.writeString(v.name)
+                net.writeVector(v.pos)
+                net.writeVector(v.size)
+                net.writeBit(v.coll)
+                net.writeVector(o)
+            end
+            
+            net.send(nil, true)
+        end
+    end
+end

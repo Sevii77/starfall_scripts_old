@@ -1,0 +1,187 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             CCCCCCCCCCCCC 333333333333333   DDDDDDDDDDDDD        
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        CCC::::::::::::C3:::::::::::::::33 D::::::::::::DDD     
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    CC:::::::::::::::C3::::::33333::::::3D:::::::::::::::DD   
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::O  C:::::CCCCCCCC::::C3333333     3:::::3DDD:::::DDDDD:::::D  
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O C:::::C       CCCCCC            3:::::3  D:::::D    D:::::D 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OC:::::C                          3:::::3  D:::::D     D:::::D
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OC:::::C                  33333333:::::3   D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OC:::::C                  3:::::::::::3    D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OC:::::C                  33333333:::::3   D:::::D     D:::::D
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OC:::::C                          3:::::3  D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OC:::::C                          3:::::3  D:::::D     D:::::D
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O C:::::C       CCCCCC            3:::::3  D:::::D    D:::::D 
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::O  C:::::CCCCCCCC::::C3333333     3:::::3DDD:::::DDDDD:::::D  
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    CC:::::::::::::::C3::::::33333::::::3D:::::::::::::::DD   
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        CCC::::::::::::C3:::::::::::::::33 D::::::::::::DDD     
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             CCCCCCCCCCCCC 333333333333333   DDDDDDDDDDDDD        
+--  
+--  DaDam's Engine Of Collsions 3D (DEOC3D) A 3D starfall collision engine
+
+--------------------
+
+local deoc = {}
+
+--------------------
+
+local function rayTriangleIntersection(rayOrigin, rayVector, inTriangle)
+    local EPSILON = 0.0000001
+    local vertex0 = inTriangle.p1
+    local vertex1 = inTriangle.p2
+    local vertex2 = inTriangle.p3
+    local edge1, edge2, h, s, q
+    local a, f, u, v
+    
+    edge1 = vertex1 - vertex0
+    edge2 = vertex2 - vertex0
+    
+    h = rayVector:cross(edge2)
+    a = edge1:dot(h)
+    
+    if a > -EPSILON and a < EPSILON then
+        return nil
+    end
+    
+    f = 1/a
+    s = rayOrigin - vertex0
+    u = f * s:dot(h)
+    
+    if u < 0.0 or u > 1.0 then
+        return nil
+    end
+    
+    q = s:cross(edge1)
+    v = f * rayVector:dot(q)
+    
+    if v < 0.0 or u + v > 1.0 then
+        return nil
+    end
+    
+    local t = f * edge2:dot(q)
+    if t > EPSILON then
+        return rayOrigin + (rayVector:getNormalized() * (t * rayVector:getLength()))
+    else
+        return nil
+    end
+end
+
+local function raycast(world, pos, normal, maxdist)
+    local triangles = {}
+    
+    for k2, v2 in pairs(world.meshes) do
+        if v2.enabled then
+            for i = 0, #v2.mesh/3 - 1 do
+                local p = v2.pos
+                local p1, p2, p3 = v2.mesh[i*3 + 1].pos + p, v2.mesh[i*3 + 2].pos + p, v2.mesh[i*3 + 3].pos + p
+                
+                table.insert(triangles, {
+                    p1 = p1,
+                    p2 = p2,
+                    p3 = p3,
+                    normal = (p2 - p1):cross(p3 - p1):getNormalized(),
+                    parent = world
+                })
+            end
+        end
+    end
+    
+    
+    local rtn = {
+        hit = false,
+        hitPos = nil,
+        hitNormal = nil,
+        startPos = pos,
+        entity = nil,
+        distance = math.huge,
+        normal = normal
+    }
+    
+    for k, v in pairs(triangles) do
+        local hpos = rayTriangleIntersection(pos, normal, {p1 = v.p1, p2 = v.p2, p3 = v.p3})
+        
+        if hpos then
+            local dist = hpos:getDistance(pos)
+            
+            if dist and dist <= maxdist and dist < rtn.distance then
+                rtn = {
+                    hit = true,
+                    hitPos = hpos,
+                    hitNormal = v.normal,
+                    startPos = pos,
+                    entity = v.parent,
+                    distance = dist,
+                    normal = normal
+                }
+            end
+        end
+    end
+    
+    return rtn
+end
+
+--------------------
+
+local world = {}
+world.__index = world
+
+function world:addMesh(mesh_, pos)
+    if (#mesh_)%3 ~= 0 then
+        error("world:addMesh, the mesh must contain a power of 3 amount vertexes. (" .. #mesh_ .. ")")
+    end
+    
+    self.curMeshInd = self.curMeshInd + 1
+    self.meshes[self.curMeshInd] = {
+        mesh = mesh_,
+        pos = pos or Vector(),
+        enabled = true
+    }
+    
+    return self.curMeshInd
+end
+
+function world:updateMesh(ind, mesh_, pos)
+    if (#mesh_)%3 ~= 0 then
+        error("world:updateMesh, the mesh must contain a power of 3 amount vertexes. (" .. #mesh_ .. ")")
+    end
+    
+    self.meshes[ind] = {
+        mesh = mesh_,
+        pos = pos or self.meshes[ind].pos,
+        enabled = true
+    }
+end
+
+function world:enableMesh(ind)
+    self.meshes[ind].enabled = true
+end
+
+function world:disableMesh(ind)
+    self.meshes[ind].enabled = false
+end
+
+function world:removeMesh(ind)
+    self.meshes[ind] = nil
+end
+
+function world:raycast(pos, normal, dist)
+    return raycast(self, pos, normal, dist)
+end
+
+function world:trace(pos, endpos)
+    return raycast(self, pos, (endpos - pos):getAngles():getForward(), pos:getDistance(endpos))
+end
+
+--------------------
+
+function deoc.createWorld()
+    local self = setmetatable({}, world)
+    
+    self.meshes = {}
+    self.entities = {}
+    self.curMeshInd = 0
+    
+    return self
+end
+
+--------------------
+
+return deoc

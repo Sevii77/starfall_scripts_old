@@ -1,0 +1,506 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     LLLLLLLLLLL             
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   L:::::::::L             
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO L:::::::::L             
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OLL:::::::LL             
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O  L:::::L               
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  L:::::L               
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O  L:::::L               
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O  L:::::L               
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O  L:::::L               
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O  L:::::L               
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  L:::::L               
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O  L:::::L         LLLLLL
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::OLL:::::::LLLLLLLLL:::::L
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO L::::::::::::::::::::::L
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   L::::::::::::::::::::::L
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     LLLLLLLLLLLLLLLLLLLLLLLL
+--  
+--  DaDam's Engine Of improved Libraries (DEOL)
+
+--------------------
+
+DEOL = {}
+DEOL.libData = "0.3"
+
+local hooks = {}
+local sound = {}
+local textures = {}
+local script = function() end
+
+local net = net
+
+--------------------
+--FUNCTIONS
+
+local oldPrintTable = printTable
+function printTable(tbl)
+    if tbl then
+        oldPrintTable(tbl)
+    else
+        print(tbl)
+    end
+end
+
+function isstring(a)
+	return type(a) == "string"
+end
+
+function istable(a)
+	return type(a) == "table" and not a.__type
+end
+
+function isnumber(a)
+	return type(a) == "number"
+end
+
+function iscolor(a)
+	return type(a) == "Color"
+end
+
+function isvector(a)
+	return type(a) == "Vector"
+end
+
+function isangle(a)
+	return type(a) == "Angle"
+end
+
+function setCode(func)
+    script = func
+    
+    script()
+end
+
+function restart()
+    for hookName, v in pairs(hook.getTable()) do
+        for name, func in pairs(v) do
+            hook.remove(hookName, name)
+        end
+    end
+    
+    for sound, v in pairs(bass.getTable()) do
+        sound:stop()
+    end
+    
+    script()
+end
+
+function reset()
+    for hookName, v in pairs(hook.getTable()) do
+        for name, func in pairs(v) do
+            hook.remove(hookName, name)
+        end
+    end
+    
+    for sound, v in pairs(bass.getTable()) do
+        sound:stop()
+    end
+    
+    script()
+end
+
+function perf_real(n)
+    return math.max(quotaAverage(), quotaUsed()) < quotaMax() * n
+end
+
+function perf(n, max)
+    return math.max(quotaAverage(), quotaUsed()) < math.min(quotaMax(), max) * n
+end
+
+
+--------------------
+--HOOK
+
+local oldHookAdd = hook.add
+local oldHookRemove = hook.remove
+local temphook = 0
+
+function hook.add(hookName, name, func)
+    local hookName = string.lower(hookName)
+    
+    hooks[hookName] = hooks[hookName] or {}
+    hooks[hookName][name] = func
+    
+    oldHookAdd(hookName, name, func)
+end
+
+function hook.remove(hookName, name)
+    local hookName = string.lower(hookName)
+    
+    if hooks[hookName] then
+        hooks[hookName][name] = nil
+    end
+    
+    oldHookRemove(hookName, name)
+end
+
+function hook.call(hookName, ...)
+    local hookName = string.lower(hookName)
+    
+    if hooks[hookName] then
+        for k, v in pairs(hooks[hookName]) do
+            if v(...) then break end
+        end
+    end
+end
+
+function hook.getTable()
+    return hooks
+end
+
+function hook.runOnce(hookName, func)
+	temphook = temphook + 1
+	local c = 'temporary_hook_once_' .. temphook
+
+	hook.add(hookName, c, function(...)
+		hook.remove(hookName, c)
+        
+		return func(...)
+	end)
+end
+
+--CLIENT CHAT HOOK
+if SERVER then
+    hook.add("PlayerSay", "CLIENTSIDE_PLAYERSAY", function(ply, text, isTeam)
+        net.start("CLIENTSIDE_PLAYERSAY")
+        net.writeString(text)
+        net.writeBit(isTeam)
+        net.send(ply)
+    end)
+else
+    hook.add("net", "CLIENTSIDE_PLAYERSAY", function(name)
+        if name == "CLIENTSIDE_PLAYERSAY" then
+            hook.call("PlayerSay", net.readString(), (net.readBit() and true or false))
+        end
+    end)
+end
+
+--------------------
+--TIMER
+
+--[[local last, delta = timer.curtime(), 0
+hook.add("think", "TIMER_DELTATIME", function()
+    local t = timer.curtime()
+    
+    delta = t - last
+    last = t
+end)]]
+
+function timer.deltatime()
+    return timer.frametime() --return delta
+end
+
+--------------------
+--BASS
+
+if CLIENT then
+    local oldBassLoadURL = bass.loadURL
+    
+    function bass.loadURL(path, flags, callback)
+        oldBassLoadURL(path, flags, function(sound, err, errorText)
+            if sound then
+                sound[sound] = true
+            end
+            
+            callback(sound, err, errorText)
+        end)
+    end
+    
+    function bass.getTable()
+        local newTbl = {}
+        
+        for k, v in pairs(sound) do
+            if k then
+                newTbl[k] = true
+            end
+        end
+        
+        sound = newTbl
+        
+        return sound
+    end
+end
+
+--------------------
+--RENDER
+
+if CLIENT then
+    function scrW()
+        local x = render.getResolution()
+        return x
+    end
+    
+    function scrH()
+        local x, y = render.getResolution()
+        return y
+    end
+    
+    local oldSetFont = render.setFont
+    local activeFont = render.getDefaultFont()
+    function render.setFont(font)
+        activeFont = font
+        oldSetFont(font)
+    end
+    
+    function render.getFont()
+        return activeFont
+    end
+    
+    local oldSetColor = render.setColor
+    local oldSetRGBA = render.setRGBA
+    local activeColor = Color(255, 255, 255)
+    function render.setColor(color)
+        activeColor = color
+        oldSetColor(color)
+    end
+    
+    function render.setRGBA(...)
+        activeColor = Color(...)
+        oldSetRGBA(...)
+    end
+    
+    function render.getColor()
+        return activeColor
+    end
+    
+    --[[
+        usage example:
+        render.formatText({
+            {text = "hello", color = Color(25, 0, 0)},
+            {text = "there", font = render.createFont("Roboto", 30)}
+        }, 50)
+    ]]
+    function render.formatText(text, maxWidth, allignment)
+        local dfont = render.getFont()
+        local dcolor = render.getColor()
+        local data
+        local tbl = {}
+        
+        local function newLine()
+            local y = 0
+            for k, v in pairs(tbl) do
+                y = y + v.size.y
+            end
+            
+            table.insert(tbl, {
+                pos = {x = 0, y = y},
+                size = {x = 0, y = 0},
+                text = {}
+            })
+        end
+        newLine()
+        
+        if type(text) == "string" then
+            data = {text}
+        elseif type(text) == "table" then
+            data = text
+        end
+        
+        for _, item2 in pairs(data) do
+            local item
+            
+            if type(item2) == "string" then
+                item = {text = item2}
+            else
+                item = item2
+            end
+            
+            local split = string.split(item.text, " ")
+            for i, txt in pairs(split) do
+                render.setFont(item.font or dfont)
+                local w, h = render.getTextSize(txt)
+                
+                if tbl[#tbl].size.x + w > maxWidth then
+                    newLine()
+                end
+                
+                local line = tbl[#tbl]
+                table.insert(line.text, {text = txt .. (i < #split and " " or ""), font = item.font, color = item.color, x = line.size.x})
+                
+                if i < #split then
+                    w = render.getTextSize(txt .. " ")
+                end
+                
+                line.size.x = line.size.x + w
+                line.size.y = math.max(line.size.y, h)
+            end
+        end
+        
+        local tbl2 = {}
+        for _, line in pairs(tbl) do
+            local pos = line.pos
+            
+            if allignment == 1 then
+                pos.x = (maxWidth - line.size.x) / 2
+            elseif allignment == 2 then
+                pos.x = maxWidth - line.size.x
+            end
+            
+            tbl2[_] = {pos = pos, size = line.size, text = {}}
+            
+            local last = {}
+            for k, v in pairs(line.text) do
+                if v.font == last.font and v.color == last.color then
+                    tbl2[_].text[#tbl2[_].text] = tbl2[_].text[#tbl2[_].text] .. v.text
+                else
+                    table.insert(tbl2[_].text, v)
+                end
+            end
+        end
+        
+        return function(x, y)
+            for _, line in pairs(tbl2) do
+                for k, v in pairs(line.text) do
+                    render.setFont(v.font or dfont)
+                    render.setColor(v.color or dcolor)
+                    render.drawText(x + line.pos.x + v.x, y + line.pos.y, v.text)
+                end
+            end
+        end
+    end
+    
+    --cached version of render.getTextureID()
+    --manages an internal cache of textures, so that cached textures are not reloaded
+    --Returns:
+    -- on success: 1. texture table
+    --             * and calls callback when texture is ready
+    -- on failure: 1. nil
+    local textureCache = {} --[url] = {lastUsed=lastUsed, tx=tx, ready=ready}
+    function getTextureID(url, cb, align, skip_hack)
+        local cached = textureCache[url]
+        if cached then --if texture is in cache, we may immediately return it
+            local lastUsed = timer.curtime()
+            cached.lastUsed = lastUsed
+            if cb then cb(result) end
+            return cached.tx
+        end
+        
+        --otherwise, we have to get new textures using render.getTextureID()
+        local function f(result)
+            textureCache[url] = {lastUsed = timer.curtime(), tx = result, ready = true}
+            
+            if cb then cb(result) end
+        end
+        
+        --we may need to dispose of textures
+        --however, we may only dispose of textures that have been loaded
+        --this presents a failure case where all textures in the cache are not yet loaded, and we cannot create new textures
+        local sorted = {}
+        for k,v in pairs(textureCache) do
+            if v.ready then
+                table.insert(sorted, {url = k, lastUsed = v.lastUsed, tx = v.tx})
+            end
+        end
+        table.sort(sorted, function(a, b) return a.lastUsed < b.lastUsed end)
+        
+        --dispose of as many loaded textures as necessary, with least recently used textures disposed first
+        local tx = nil
+        local success, x = pcall(render.getTextureID, url, f, align, skip_hack)
+        if success then
+            tx = x
+            textureCache[url] = {lastUsed = timer.curtime(), tx = tx, ready = false}
+            
+            return tx
+        end
+        
+        for i = 1, #sorted do
+            local success, x = pcall(render.getTextureID, url, f, align, skip_hack)
+            if success then
+                tx = x
+                textureCache[url] = {lastUsed = timer.curtime(), tx = tx, ready = false}
+                
+                return tx
+            else
+                local lastURL, lastTime = sorted[i].url, sorted[i].lastUsed
+                local last = textureCache[lastURL]
+                
+                render.destroyTexture(last.tx)
+                textureCache[lastURL] = nil
+            end
+        end
+        
+        return nil
+    end
+end
+
+--------------------
+--MATH
+
+function math.lerp2(V1, V2, T)
+    return V1 + (V2 - V1)*T
+end
+
+function math.bezier(P, T)
+    local C = P
+    local I = #C
+    
+    while I > 1 do
+        I = I - 1
+        CP = {}
+        
+        for I = 1, #C - 1 do
+            table.insert(CP, math.lerp2(C[I], C[I+1], T))
+        end
+        
+        C = CP
+        
+        if #C == 1 then
+            break
+        end
+    end
+    
+    return C[1]
+end
+
+local mathMin, mathMax = math.min, math.max
+
+function math.min(...)
+	if isvector(({...})[1]) then
+		local x, y = {}, {}
+		
+		for k, v in pairs(({...})) do
+			table.insert(x, v.x)
+			table.insert(y, v.y)
+		end
+		
+		return Vector(mathMin(unpack(x)), mathMin(unpack(y)))
+	else
+		return mathMin(...)
+	end
+end
+
+function math.max(...)
+	if isvector(({...})[1]) then
+		local x, y = {}, {}
+		
+		for k, v in pairs(({...})) do
+			table.insert(x, v.x)
+			table.insert(y, v.y)
+		end
+		
+		return Vector(mathMax(unpack(x)), mathMax(unpack(y)))
+	else
+		return mathMax(...)
+	end
+end
+
+function math.clamp(val, min, max)
+	return math.max(math.min(val, max), min)
+end
+
+function math.round(val, numDecimalPlaces)
+	if isvector(val) then
+		return Vector(math.round(val.x, numDecimalPlaces), math.round(val.y, numDecimalPlaces), math.round(val.z, numDecimalPlaces))
+	else
+		local mult = 10^(numDecimalPlaces or 0)
+		return math.floor(val * mult + 0.5) / mult
+	end
+end
+
+function math.inrange(val, min, max)
+	if isvector(val) then
+		return val.x >= min.x and val.x <= max.x and val.y >= min.y and val.y <= max.y
+	else
+		return val >= min and val <= max
+	end
+end

@@ -1,0 +1,261 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     VVVVVVVV           VVVVVVVV 333333333333333   DDDDDDDDDDDDD        
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   V::::::V           V::::::V3:::::::::::::::33 D::::::::::::DDD     
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO V::::::V           V::::::V3::::::33333::::::3D:::::::::::::::DD   
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OV::::::V           V::::::V3333333     3:::::3DDD:::::DDDDD:::::D  
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O V:::::V           V:::::V             3:::::3  D:::::D    D:::::D 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  V:::::V         V:::::V              3:::::3  D:::::D     D:::::D
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O   V:::::V       V:::::V       33333333:::::3   D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O    V:::::V     V:::::V        3:::::::::::3    D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O     V:::::V   V:::::V         33333333:::::3   D:::::D     D:::::D
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O      V:::::V V:::::V                  3:::::3  D:::::D     D:::::D
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O       V:::::V:::::V                   3:::::3  D:::::D     D:::::D
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O        V:::::::::V                    3:::::3  D:::::D    D:::::D 
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::O         V:::::::V         3333333     3:::::3DDD:::::DDDDD:::::D  
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO           V:::::V          3::::::33333::::::3D:::::::::::::::DD   
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO              V:::V           3:::::::::::::::33 D::::::::::::DDD     
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO                 VVV             333333333333333   DDDDDDDDDDDDD        
+--  
+--  DaDam's Engine Of Visuals 3D (DEOV3D) A 3D starfall adv visual engine
+
+--------------------
+
+local deov = {}
+deov.texturesLoading = 0
+
+local DEOV = {}
+DEOV.textures = {}
+DEOV.textureIDs = {}
+DEOV.rts = {}
+
+--------------------
+
+local function getRotated(pos, ang)
+    pos:rotate(ang)
+    return pos
+end
+
+--------------------
+
+local deovMesh = {}
+deovMesh.__index = deovMesh
+
+function deovMesh:createTexturedMesh()
+    local tbl = {}
+    
+    for k2, v2 in pairs(self.data) do
+        tbl[v2.texture] = tbl[v2.texture] or {}
+        
+        for k, v in pairs(v2.vertexes) do
+            table.insert(tbl[v2.texture], v)
+        end
+    end
+    
+    if self.mesh then
+        for k, v in pairs(self.mesh) do
+            v:destroy()
+        end
+    end
+    
+    self.vertexes = tbl
+    
+    self.mesh = {}
+    for k, v in pairs(tbl) do
+        self.mesh[k] = mesh.createFromTable(v)
+    end
+end
+
+function deovMesh:createVertexes()
+    local tbl = {}
+    
+    for k2, v2 in pairs(self.data) do
+        for k, v in pairs(v2.vertexes) do
+            table.insert(tbl, v)
+        end
+    end
+    
+    self.vertexes = tbl
+end
+
+function deovMesh:destroy()
+    if self.mesh then
+        for k, v in pairs(self.mesh) do
+            v:destroy()
+        end
+    end
+    
+    self.mesh = nil
+end
+
+function deovMesh:addRectAdv(textureID, textureData, pos, size, ang, flipx, flipy, color, uv1, uv2, tang)
+    local data = textureData
+    
+    local uv1 = uv1 or Vector(0, 0)
+    local uv2 = uv2 or Vector(1, 1)
+    
+    local mul = data.uv2 - data.uv1
+    local duv1 = data.uv1 + uv1 * mul
+    local duv2 = data.uv1 + uv2 * mul
+    
+    if tang == 90 then
+        duv1 = Vector(data.uv1.x, data.uv2.y)
+        duv2 = Vector(data.uv2.x, data.uv1.y)
+    elseif tang == 180 then
+        flipx = not flipx
+        flipy = not flipy
+    elseif tang == 270 then
+        duv1 = Vector(data.uv2.x, data.uv1.y)
+        duv2 = Vector(data.uv1.x, data.uv2.y)
+    end
+    
+    self.curDataInd = self.curDataInd + 1
+    self.data[self.curDataInd] = {
+        --texture = DEOV.rts[data.texture],
+        texture = textureID,
+        vertexes = {
+            {
+                pos = pos - getRotated(Vector(size.x/2, size.y/2, 0), ang),
+                u = duv1.x * (flipx and 0 or 1) + duv2.x * (flipx and 1 or 0),
+                v = duv1.y * (flipy and 0 or 1) + duv2.y * (flipy and 1 or 0),
+                color = color
+            }, {
+                pos = pos + getRotated(Vector(-size.x/2, size.y/2, 0), ang),
+                u = duv1.x * (flipx and 0 or 1) + duv2.x * (flipx and 1 or 0),
+                v = duv1.y * (flipy and 1 or 0) + duv2.y * (flipy and 0 or 1),
+                color = color
+            }, {
+                pos = pos + getRotated(Vector(size.x/2, -size.y/2, 0), ang),
+                u = duv1.x * (flipx and 1 or 0) + duv2.x * (flipx and 0 or 1),
+                v = duv1.y * (flipy and 0 or 1) + duv2.y * (flipy and 1 or 0),
+                color = color
+            },
+            
+            
+            {
+                pos = pos + getRotated(Vector(size.x/2, -size.y/2, 0), ang),
+                u = duv1.x * (flipx and 1 or 0) + duv2.x * (flipx and 0 or 1),
+                v = duv1.y * (flipy and 0 or 1) + duv2.y * (flipy and 1 or 0),
+                color = color
+            }, {
+                pos = pos + getRotated(Vector(-size.x/2, size.y/2, 0), ang),
+                u = duv1.x * (flipx and 0 or 1) + duv2.x * (flipx and 1 or 0),
+                v = duv1.y * (flipy and 1 or 0) + duv2.y * (flipy and 0 or 1),
+                color = color
+            }, {
+                pos = pos + getRotated(Vector(size.x/2, size.y/2, 0), ang),
+                u = duv1.x * (flipx and 1 or 0) + duv2.x * (flipx and 0 or 1),
+                v = duv1.y * (flipy and 1 or 0) + duv2.y * (flipy and 0 or 1),
+                color = color
+            }
+        }
+    }
+    
+    return self.curDataInd
+end
+
+function deovMesh:addRect(texture, ...)
+    local data = DEOV.textures[texture]
+    
+    self:addRectAdv(DEOV.textureIDs[data.texture], data, ...)
+    
+    return self.curDataInd
+end
+
+function deovMesh:removeRect(ind)
+    self.data[self.curDataInd] = nil
+end
+
+function deovMesh:render(pos, size, ang, viewmatrix)
+    if self.mesh then
+        if not viewmatrix then
+            local m = Matrix()
+            m:setTranslation(pos)
+            m:setAngles(ang)
+            m:setScale(size)
+            
+            render.pushMatrix(m)
+            for k, v in pairs(self.mesh) do
+                render.setTexture(k)
+                --render.setRenderTargetTexture(k)
+                v:draw()
+            end
+            render.popMatrix()
+        else
+            render.pushViewMatrix(viewmatrix)
+            
+            local m = Matrix()
+            m:setTranslation(pos)
+            m:setAngles(ang)
+            m:setScale(size)
+            
+            render.pushMatrix(m)
+            for k, v in pairs(self.mesh) do
+                render.setTexture(k)
+                --render.setRenderTargetTexture(k)
+                v:draw()
+            end
+            render.popMatrix()
+            render.popViewMatrix()
+        end
+    end
+end
+
+--------------------
+
+function deov.registerTextures(url, data, texture)
+    for name, v in pairs(data) do
+        DEOV.textures[name] = {
+            texture = url,
+            uv1 = v.uv1,
+            uv2 = v.uv2
+        }
+    end
+    
+    if not DEOV.textureIDs[url] then
+        local function createRT(texture)
+            render.createRenderTarget("deov3drt_" .. url)
+            
+            hook.add("renderoffscreen", "deov3dRTTexture_" .. url, function()
+                render.selectRenderTarget("deov3drt_" .. url)
+                render.clear(Color(0, 0, 0, 0))
+                
+                render.setColor(Color(255, 255, 255))
+                render.setTexture(texture)
+                render.drawTexturedRect(0, 0, 1024, 1024)
+                
+                render.selectRenderTarget()
+                
+                hook.remove("renderoffscreen", "deov3dRTTexture_" .. url)
+            end)
+            
+            DEOV.rts[url] = "deov3drt_" .. url
+            DEOV.textureIDs[url] = render.getTextureID(render.getRenderTargetMaterial("deov3drt_" .. url), nil, nil, true)
+        end
+        
+        if texture then
+            createRT(texture)
+        else
+            deov.texturesLoading = deov.texturesLoading + 1
+            
+            render.getTextureID(url, function(text)
+                createRT(text)
+                
+                deov.texturesLoading = deov.texturesLoading - 1
+            end--[[, nil, true]])
+        end
+    end
+end
+
+function deov.createMesh()
+    local self = setmetatable({}, deovMesh)
+    
+    self.data = {}
+    self.mesh = nil
+    self.texture = nil
+    self.curDataInd = 0
+    
+    return self
+end
+
+--------------------
+
+return deov

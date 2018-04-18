@@ -1,0 +1,58 @@
+local defaultFont = render.createFont("roboto", 18, 800)
+
+local gui = {
+    button = {
+        font = defaultFont,
+        color = Color(80, 80, 80),
+        colorHover = Color(100, 100, 100),
+        colorClick = Color(65, 65, 65),
+        colorText = Color(255, 255, 255)
+    }, slider = {
+        font = defaultFont,
+        color = Color(50, 50, 50),
+        colorHandle = Color(200, 200, 200),
+        colorSelected = Color(30, 255, 160),
+        colorText = Color(255, 255, 255)
+    }
+}
+
+local elements = {}
+local objects = {}
+
+----------
+
+function gui.registerElement(name, data)
+    elements[name] = data
+end
+
+function gui.create(typ, parent)
+    if not elements[typ] then return end
+    
+    table.add(objects, {
+        data = table.copy(elements[typ].default),
+        parent = parent,
+        children = {}
+    })
+
+    local data = objects[#objects].data
+    data.remove = function()
+        for k, v in pairs(objects) do
+            if v.data == data then
+                tables.remove(objects, k)
+                break
+            end
+        end
+    end
+    
+    if parent then
+        table.add(parent.children, objects[#objects])
+    end
+    
+    return objects[#objects]
+end
+
+function gui.render()
+    
+end
+
+----------

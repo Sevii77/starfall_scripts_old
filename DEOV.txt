@@ -1,0 +1,872 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     VVVVVVVV           VVVVVVVV
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   V::::::V           V::::::V
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO V::::::V           V::::::V
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OV::::::V           V::::::V
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O V:::::V           V:::::V 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  V:::::V         V:::::V  
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O   V:::::V       V:::::V   
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O    V:::::V     V:::::V    
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O     V:::::V   V:::::V     
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O      V:::::V V:::::V      
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O       V:::::V:::::V       
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O        V:::::::::V        
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::O         V:::::::V         
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO           V:::::V          
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO              V:::V           
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO                 VVV            
+--  
+--  DaDam's Engine Of Visuals (DEOV) A 2d starfall adv visual engine
+
+--------------------
+
+local DEOV = {}
+DEOV.invalidSprite = nil
+DEOV.libData = "1.5"
+DEOV.sprites = {}
+DEOV.animatedSprites = {}
+DEOV.animatedSprites2 = {}
+DEOV.objects = {}
+DEOV.textures = {}
+DEOV.texturesLoading = 0
+DEOV.particles = {
+    particles = {},
+    particleData = {},
+    particleSettings = {}
+}
+DEOV.trails = {
+    trails = {},
+    trailData = {},
+    types = {
+        ["color"] = function(color, fadeDelay, fadeTime)
+            return {
+                pos = {x = 0, y = 0},
+                oldPos = {x = 0, y = 0},
+                color = function() return color end,
+                fadeDelay = fadeDelay,
+                fadeTime = fadeTime,
+                segments = {}
+            }
+        end,
+        ["rainbow"] = function(color, fadeDelay, fadeTime)
+            return {
+                pos = {x = 0, y = 0},
+                oldPos = {x = 0, y = 0},
+                color = function() return Color((timer.curtime() * color.r) % 360, color.g, color.b, color.a):hsvToRGB() end,
+                fadeDelay = fadeDelay,
+                fadeTime = fadeTime,
+                segments = {}
+            }
+        end
+    }
+}
+DEOV.ghosts = {
+    sprites = {}
+}
+
+local sX, sY = 0, 0
+local ghostInd = 0
+
+--------------------
+
+hook.add("render", "DEOV_GHOST", function()
+    ghostInd = 0
+end)
+
+--------------------
+
+function DEOV.ghostSprite(time, delay, tname, pos, size, ang, flipx, flipy)
+    local v = DEOV.ghosts.sprites[tname .. ghostInd] or {}
+    
+    DEOV.ghosts.sprites[tname .. ghostInd] = {
+        time = time,
+        delay = delay,
+        delayT = v.delayT or timer.curtime(),
+        name = tname,
+        pos = pos,
+        oldPos = v.oldPos or pos,
+        size = size,
+        oldSize = v.oldSize or size,
+        ang = ang,
+        oldAng = v.oldAng or ang,
+        flipx = flipx,
+        oldFlipx = v.oldFlipx or flipx,
+        flipy = flipy,
+        oldFlipy = v.oldFlipy or flipy,
+        ghosts = v.ghosts or {}
+    }
+    
+    ghostInd = ghostInd + 1
+end
+
+function DEOV.clearGhost(name)
+    DEOV.ghosts.sprites[name] = nil
+end
+
+function DEOV.renderGhosts()
+    for k, v in pairs(DEOV.ghosts.sprites) do
+        if timer.curtime() >= v.delayT + v.delay and (v.pos != v.oldPos or v.size != v.oldSize or v.ang != v.oldAng or v.flipx != v.oldFlipx or v.flipy != v.oldFlipy) then
+            DEOV.ghosts.sprites[k].delayT = timer.curtime()
+            --print("insert")
+            table.insert(DEOV.ghosts.sprites[k].ghosts, {
+                time = timer.curtime(),
+                pos = v.pos,
+                size = v.size,
+                ang = v.ang,
+                flipx = v.flipx,
+                flipy = v.flipy
+            })
+        end
+        
+        v.oldPos = v.pos
+        v.oldSize = v.size
+        v.oldAng = v.ang
+        v.oldFlipx = v.flipx
+        v.oldFlipy = v.flipy
+        
+        for k2, v2 in pairs(v.ghosts) do
+            if timer.curtime() >= v.time + v2.time then
+                table.remove(DEOV.ghosts.sprites[k].ghosts, k2)
+                
+                if #DEOV.ghosts.sprites[k].ghosts == 0 then
+                    DEOV.ghosts.sprites[k] = nil
+                end
+            end
+            
+            local data = DEOV.sprites[v.name]
+            
+            render.setColor(Color(255, 255, 255, math.max(0, 255 - (timer.curtime() - v2.time) / v.time * 255)))
+            
+            render.setTexture(DEOV.textures[data.texture])
+            
+            if v2.ang and v2.ang != 0 then
+                local m = Matrix()
+                m:setTranslation(Vector(v2.pos.x - sX, v2.pos.y - sY, 0))
+                m:setAngles(Angle(0, v2.ang, 0))
+                
+                render.pushMatrix(m, false)
+                
+                render.drawTexturedRectUV(-v2.size.x/2, -v2.size.y/2, v2.size.x, v2.size.y, 
+                    data.uv1.x * (v2.flipx and 0 or 1) + data.uv2.x * (v2.flipx and 1 or 0), 
+                    data.uv1.y * (v2.flipy and 0 or 1) + data.uv2.y * (v2.flipy and 1 or 0), 
+                    data.uv1.x * (v2.flipx and 1 or 0) + data.uv2.x * (v2.flipx and 0 or 1), 
+                    data.uv1.y * (v2.flipy and 1 or 0) + data.uv2.y * (v2.flipy and 0 or 1)
+                )
+                
+                render.popMatrix()
+            else
+                render.drawTexturedRectUV(v2.pos.x - v2.size.x/2 - sX, v2.pos.y - v2.size.y/2 - sY, v2.size.x, v2.size.y, 
+                    data.uv1.x * (v2.flipx and 0 or 1) + data.uv2.x * (v2.flipx and 1 or 0), 
+                    data.uv1.y * (v2.flipy and 0 or 1) + data.uv2.y * (v2.flipy and 1 or 0), 
+                    data.uv1.x * (v2.flipx and 1 or 0) + data.uv2.x * (v2.flipx and 0 or 1), 
+                    data.uv1.y * (v2.flipy and 1 or 0) + data.uv2.y * (v2.flipy and 0 or 1)
+                )
+            end
+        end
+    end
+end
+
+--------------------
+
+function DEOV.registerTrailType(type_, data)
+    DEOV.trails[type_] = function(color, fadeDelay, fadeTime) return data end
+end
+
+function DEOV.createTrail(name, type_, color, fadeDelay, fadeTime)
+    DEOV.trails.trailData[name] = DEOV.trails.types[type_](color, fadeDelay, fadeTime)
+end
+
+function DEOV.removeTrail(name)
+    DEOV.trails.trailData[name] = nil
+end
+
+function DEOV.trailPos(name, pos)
+    if not pos then
+        return DEOV.trails.trailData[name].pos
+    else
+        DEOV.trails.trailData[name].pos = pos
+    end
+end
+
+function DEOV.renderTrails()
+    for k, v in pairs(DEOV.trails.trailData) do
+        if v.pos != v.oldPos then
+            table.insert(DEOV.trails.trailData[k].segments, {
+                time = timer.curtime(),
+                p1 = v.pos,
+                p2 = v.oldPos,
+                color = v.color()
+            })
+        end
+        
+        DEOV.trails.trailData[k].oldPos = v.pos
+        
+        for k2, v2 in pairs(v.segments) do
+            if timer.curtime() >= v2.time + v.fadeDelay + v.fadeTime then
+                table.remove(DEOV.trails.trailData[k].segments, k2)
+            else
+                local clr = Color(v2.color.r, v2.color.g, v2.color.b)
+                
+                if timer.curtime() >= v2.time + v.fadeDelay then
+                    clr.a = v2.color.a - (timer.curtime() - v2.time - v.fadeDelay) / v.fadeTime * v2.color.a
+                    
+                    --print(clr.a)
+                else
+                    clr.a = v2.color.a
+                end
+                
+                render.setColor(clr)
+                
+                render.drawLine(v2.p1.x, v2.p1.y, v2.p2.x, v2.p2.y)
+            end
+        end
+        
+        --print("---------------")
+    end
+end
+
+--------------------
+
+function DEOV.registerParticle(name, data)
+    DEOV.particles.particleData[name] = {}
+    DEOV.particles.particleSettings[name] = data
+end
+
+function DEOV.createParticle(type, pos, vel)
+    table.insert(DEOV.particles.particleData[type], {pos = pos, vel = vel, size = DEOV.particles.particleSettings[type].size})
+end
+
+function DEOV.renderParticles(scale, tl, br, simspeed)
+    local simspeed = simspeed*40
+    
+    for k2, v2 in pairs(DEOV.particles.particleData) do
+        render.setColor(DEOV.particles.particleSettings[k2].colr)
+        
+        for k, v in pairs(v2) do
+            local velR = 0
+            
+            if v.vel.x > 0 then
+                velR = math.min(v.vel.x, DEOV.particles.particleSettings[k2].rest)
+            elseif v.vel.x < 0 then
+                velR = math.max(v.vel.x, -DEOV.particles.particleSettings[k2].rest)
+            end
+            
+            local pos = {x = v.pos.x + v.vel.x*scale * timer.frametime()*simspeed, y = v.pos.y + v.vel.y*scale * timer.frametime()*simspeed}
+            local vel = {x = v.vel.x - velR, y = v.vel.y + DEOV.particles.particleSettings[k2].grav}
+            
+            if pos.x < br.x and pos.x > tl.x and pos.y < br.y and pos.y > tl.y then
+                DEOV.particles.particleData[k2][k].pos = pos
+                DEOV.particles.particleData[k2][k].vel = vel
+                
+                DEOV.particles.particleSettings[k2].func(k2, k)
+                render.drawRect(pos.x, pos.y, v.size*scale, v.size*scale)
+            else
+                DEOV.particles.particleData[k2][k] = nil
+            end
+        end
+    end
+end
+
+DEOV.registerParticle("fire", {
+    grav = -0.2,
+    rest = 0.04,
+    size = 5,
+    colr = Color(255, 150, 0, 255),
+    func = function(k2, k)
+        if DEOV.particles.particleData[k2][k].color == nil then
+            DEOV.particles.particleData[k2][k].color = Color(255, 150, 0, 255)
+        end
+        
+        DEOV.particles.particleData[k2][k].color = DEOV.particles.particleData[k2][k].color - Color(255, 150, 0, 255)/40
+        render.setColor(DEOV.particles.particleData[k2][k].color)
+        
+        if DEOV.particles.particleData[k2][k].color.a < 150 then
+            DEOV.particles.particleData[k2][k].size = DEOV.particles.particleData[k2][k].size + 0.2
+        
+            if DEOV.particles.particleData[k2][k].color.a <= 0 then
+                DEOV.particles.particleData[k2][k] = nil
+            end
+        end
+    end
+})
+
+DEOV.registerParticle("rainbow", {
+    grav = -0.2,
+    rest = 0.04,
+    size = 5,
+    colr = Color(255, 255, 255, 255),
+    func = function(k2, k)
+        if DEOV.particles.particleData[k2][k].rainbow == nil then
+            DEOV.particles.particleData[k2][k].rainbow = 0
+            DEOV.particles.particleData[k2][k].alpha = 255
+        end
+        
+        DEOV.particles.particleData[k2][k].rainbow = DEOV.particles.particleData[k2][k].rainbow + 5
+        DEOV.particles.particleData[k2][k].alpha = 255 - DEOV.particles.particleData[k2][k].rainbow/360*255
+        render.setColor(Color(DEOV.particles.particleData[k2][k].rainbow, 1, 1):hsvToRGB():setA(DEOV.particles.particleData[k2][k].alpha))
+        
+        if DEOV.particles.particleData[k2][k].alpha <= 0 then
+            DEOV.particles.particleData[k2][k] = nil
+        end
+    end
+})
+
+DEOV.registerParticle("dust", {
+    grav = 0,
+    rest = 0,
+    size = 3,
+    colr = Color(240, 240, 240, 40),
+    func = function(k2, k) end
+})
+
+--------------------
+
+function DEOV.registerSprites(url, data, texture)
+    for name, v in pairs(data) do
+        DEOV.sprites[name] = {
+            texture = url,
+            uv1 = v.uv1,
+            uv2 = v.uv2,
+            ratio = {x = math.min(1, (v.uv2.x - v.uv1.x) / (v.uv2.y - v.uv1.y)), y = math.min(1, (v.uv2.y - v.uv1.y) / (v.uv2.x - v.uv1.x))}
+        }
+    end
+    
+    if not DEOV.textures[url] then
+        DEOV.textures[url] = texture or render.getTextureID(url, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+        DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+    end
+end
+
+function DEOV.registerSprite(url, name, uv1, uv2, texture)
+    DEOV.sprites[name] = {
+        texture = url,
+        uv1 = uv1,
+        uv2 = uv2,
+        ratio = {x = math.min(1, (uv2.x - uv1.x) / (uv2.y - uv1.y)), y = math.min(1, (uv2.y - uv1.y) / (uv2.x - uv1.x))}
+    }
+    
+    if not DEOV.textures[url] then
+        DEOV.textures[url] = texture or render.getTextureID(url, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+        DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+    end
+end
+
+function DEOV.spriteExist(name)
+    return DEOV.sprites[name] != nil
+end
+
+function DEOV.renderSprite(name, pos, size, ang, flipx, flipy)
+    --[[if not DEOV.sprites[name] then
+        error("DEOV error: sprite '" .. tostring(name) .. "' does not exist.")
+    end]]
+    
+    local data = DEOV.sprites[name] or DEOV.sprites[DEOV.invalidSprite]
+    local size = {x = size.x * data.ratio.x, y = size.y * data.ratio.y}
+    
+    render.setTexture(DEOV.textures[data.texture])
+    
+    if ang and ang != 0 then
+        local m = Matrix()
+        m:setTranslation(Vector(pos.x - sX, pos.y - sY, 0))
+        m:setAngles(Angle(0, ang, 0))
+        
+        render.pushMatrix(m, false)
+        
+        render.drawTexturedRectUV(-size.x/2, -size.y/2, size.x, size.y, 
+            data.uv1.x * (flipx and 0 or 1) + data.uv2.x * (flipx and 1 or 0), 
+            data.uv1.y * (flipy and 0 or 1) + data.uv2.y * (flipy and 1 or 0), 
+            data.uv1.x * (flipx and 1 or 0) + data.uv2.x * (flipx and 0 or 1), 
+            data.uv1.y * (flipy and 1 or 0) + data.uv2.y * (flipy and 0 or 1)
+        )
+        
+        render.popMatrix()
+    else
+        render.drawTexturedRectUV(pos.x - size.x/2 - sX, pos.y - size.y/2 - sY, size.x, size.y, 
+            data.uv1.x * (flipx and 0 or 1) + data.uv2.x * (flipx and 1 or 0), 
+            data.uv1.y * (flipy and 0 or 1) + data.uv2.y * (flipy and 1 or 0), 
+            data.uv1.x * (flipx and 1 or 0) + data.uv2.x * (flipx and 0 or 1), 
+            data.uv1.y * (flipy and 1 or 0) + data.uv2.y * (flipy and 0 or 1)
+        )
+    end
+end
+
+function DEOV.setInvalidSprite(name)
+    DEOV.invalidSprite = name
+end
+
+--------------------
+
+function DEOV.registerAnimatedSprite(url, data, texture)
+    DEOV.animatedSprites[url] = data
+    
+    if not DEOV.textures[url] then
+        DEOV.textures[url] = texture or render.getTextureID(url, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+        DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+    end
+end
+
+function DEOV.animatedSpriteExist(name)
+    return DEOV.animatedSprites[name] != nil
+end
+
+function DEOV.renderAnimatedSprite(url, pos, size, flipx, flipy, frame)
+    if not DEOV.animatedSprites[url] then
+        error("DEOV error: animated sprite '" .. tostring(url) .. "' does not exist.")
+    end
+    
+    local data = DEOV.animatedSprites[url]
+    
+    local flip = flip or false
+    local frame = frame or math.ceil(timer.curtime() * data.fps)%data.frames
+    
+    local u1 = (frame)%data.x * data.spritex / data.resx
+    local u2 = ((frame)%data.x + 1) * data.spritex / data.resx
+    local v1 = math.floor((frame)/data.x) * data.spritey / data.resy
+    local v2 = math.floor((frame)/data.x + 1) * data.spritey / data.resy
+    
+    --render.drawTexturedRectUV(pos.x - size.x/2, pos.y - size.y/2, size.x, size.y, (frame)%data.x / data.x, math.floor((frame)/data.x) / data.y, ((frame)%data.x + 1) / data.x, math.floor((frame)/data.x + 1) / data.y)
+    render.setTexture(DEOV.textures[url])
+    render.drawTexturedRectUV(pos.x - size.x/2 - sX, pos.y - size.y/2 - sY, size.x, size.y, 
+        u1 * (flipx and 0 or 1) + u2 * (flipx and 1 or 0), 
+        v1 * (flipy and 0 or 1) + v2 * (flipy and 1 or 0), 
+        u1 * (flipx and 1 or 0) + u2 * (flipx and 0 or 1), 
+        v1 * (flipy and 1 or 0) + v2 * (flipy and 0 or 1)
+    )
+end
+
+--------------------
+
+function DEOV.registerAnimatedSprite2(name, data)
+    if #data == 0 then
+        error("DEOV error: animated sprite2 dataTable does not contain any data.")
+    end
+    
+    local tbl = {
+        data = data,
+        time = {},
+        duration = 0
+    }
+    
+    for k, v in pairs(data) do
+        if not v.time then
+            error("DEOV error: animated sprite2 dataTable index " .. k .. " does not contain argument 'time'")
+        elseif not v.sprite then
+            error("DEOV error: animated sprite2 dataTable index " .. k .. " does not contain argument 'sprite'")
+        end
+        
+        --tbl.time[tbl.duration] = k
+        table.insert(tbl.time, {time = tbl.duration, key = k})
+        
+        tbl.duration = tbl.duration + v.time
+    end
+    
+    DEOV.animatedSprites2[name] = tbl
+    
+    --[[
+        data table:
+        {
+            [1] = {
+                sprite = "sprite1",
+                time = 0.5,
+                flipx = true
+            }, [2] = {
+                sprite = "sprite2",
+                time = 0.5,
+                pos = Vector(5, 5),
+                flipy = true
+            }, [3] = {
+                sprite = "sprite3",
+                time = 1,
+                ang = 45
+            }
+        }
+        
+        possible args:
+            -time [number] = amount of time the sprite will be shown
+            -flipx [boolean] = flip x direction
+            -flipy [boolean] = flip y direction
+            -pos [vector] = position to offet the sprite by
+            -size [vector] = size to multiply by
+            -ang [number] = angle to offset animation
+    ]]
+end
+
+function DEOV.animatedSpriteExist2(name)
+    return DEOV.animatedSprites2[name] != nil
+end
+
+function DEOV.renderAnimatedSprite2(name, pos, size, ang, flipx, flipy, time)
+    if not DEOV.animatedSprites2[name] then
+        error("DEOV error: animated sprite2 '" .. tostring(name) .. "' does not exist.")
+    end
+    
+    local d = DEOV.animatedSprites2[name]
+    local time = math.clamp((time or timer.curtime())%d.duration, 0.001, d.duration - 0.001)
+    local data
+    local pos, size = Vector(pos.x, pos.y), Vector(size.x, size.y)
+    
+    for k, v in pairs(d.time) do
+        if v.time <= time then
+            data = d.data[v.key]
+        end
+    end
+    
+    if data.flipx then
+        flipx = not (flipx or false)
+    end
+    
+    if data.flipy then
+        flipy = not (flipy or false)
+    end
+    
+    DEOV.renderSprite(data.sprite, pos + (data.pos or Vector()), size * (data.size or Vector(1, 1)), (ang or 0) + (data.ang or 0), flipx, flipy)
+end
+
+--------------------
+
+function DEOV.screenPos(pos)
+    if pos then
+        sX = pos.x
+        sY = pos.y
+    else
+        return Vector(sX, sY)
+    end
+end
+
+--------------------
+
+if DEOC then
+    function DEOV.registerHitboxes(key, text, formatdata)
+        formatdata = formatdata or {["default"] = 0}
+        
+        if formatdata["default"] then
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+                DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+            end
+            
+            for k, v in pairs(DEOC.objects) do
+                if string.find(v.name, key) then
+                    DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                        x = v.pos.x,
+                        y = v.pos.y,
+                        sx = v.size.x,
+                        sy = v.size.y,
+                        rot = formatdata["default"]
+                    }
+                end
+            end
+        end
+        
+        if formatdata["connected"] then
+            local text = formatdata["connected"].texture
+            
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+                DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+            end
+            
+            for k1, v2 in pairs(DEOC.objects) do
+                local name = v2.name
+                
+                if string.find(name, key) then
+                    local textData = ""
+                    local colData = {}
+                    
+                    for k, v in pairs(DEOC.objects) do
+                        if v.name != name then
+                            if v.pos.x + v.size.x/2 == DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 and v.pos.y + v.size.y/2 == DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 then
+                                colData["00"] = true
+                            end
+                            
+                            if v.pos.x == DEOC.objects[name].pos.x and v.pos.y + v.size.y/2 == DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 then
+                                colData["10"] = true
+                            end
+                            
+                            if v.pos.x - v.size.x/2 == DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 and v.pos.y + v.size.y/2 == DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 then
+                                colData["20"] = true
+                            end
+                            
+                            if v.pos.x - v.size.x/2 == DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 and v.pos.y == DEOC.objects[name].pos.y then
+                                colData["21"] = true
+                            end
+                            
+                            if v.pos.x - v.size.x/2 == DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 and v.pos.y - v.size.y/2 == DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 then
+                                colData["22"] = true
+                            end
+                            
+                            if v.pos.x == DEOC.objects[name].pos.x and v.pos.y - v.size.y/2 == DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 then
+                                colData["12"] = true
+                            end
+                            
+                            if v.pos.x + v.size.x/2 == DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 and v.pos.y - v.size.y/2 == DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 then
+                                colData["02"] = true
+                            end
+                            
+                            if v.pos.x + v.size.x/2 == DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 and v.pos.y == DEOC.objects[name].pos.y then
+                                colData["01"] = true
+                            end
+                        end
+                    end
+                    
+                    if colData["00"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["10"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["20"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["21"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["22"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["12"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["02"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    if colData["01"] then
+                        textData = textData .. "1"
+                    else
+                        textData = textData .. "0"
+                    end
+                    
+                    local td = formatdata["connected"].data[table.getKeys(formatdata["connected"].data)[1]] --formatdata["connected"].data[textData] or formatdata["connected"].data[table.getKeys(formatdata["connected"].data)[1]]
+                        
+                    for key, data in pairs(formatdata["connected"].data) do
+                        local c = 0
+                        
+                        for k, value in pairs(string.explode("", key)) do
+                            if string.sub(textData, k, k) == value or value == "2" then
+                                c = c + 1
+                            end
+                            
+                            if c == 8 then
+                                td = data
+                            end
+                        end
+                    end
+                    
+                    if td then
+                        DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                            x = v2.pos.x,
+                            y = v2.pos.y,
+                            sx = v2.size.x,
+                            sy = v2.size.y,
+                            uv1 = td.uv1,
+                            uv2 = td.uv2
+                        }
+                    end
+                end
+            end
+        end
+        
+        if formatdata["toptexture"] then
+            local text = formatdata["toptexture"].texture
+            
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+                DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+            end
+            
+            for k1, v2 in pairs(DEOC.objects) do
+                local name = v2.name
+                
+                if string.find(name, key) then
+                    local col = false
+                    
+                    for k, v in pairs(DEOC.objects) do
+                        if v.coll and v.name != name and v.pos.y + v.size.y/2 >= DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 and v.pos.y + v.size.y/2 < DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 then
+                            if DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 > v.pos.x - v.size.x/2 and DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 < v.pos.x + v.size.x/2 then
+                                col = true
+                                
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not col then
+                        DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                            x = v2.pos.x,
+                            y = v2.pos.y,
+                            sx = v2.size.x,
+                            sy = v2.size.y,
+                            rot = formatdata["toptexture"].rotation or 0
+                        }
+                    end
+                end
+            end
+        end
+        
+        if formatdata["bottemtexture"] then
+            local text = formatdata["bottemtexture"].texture
+            
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text)
+            end
+            
+            for k1, v2 in pairs(DEOC.objects) do
+                local name = v2.name
+                
+                if string.find(name, key) then
+                    local col = false
+                    
+                    for k, v in pairs(DEOC.objects) do
+                        if v.coll and v.name != name and v.pos.y - v.size.y/2 <= DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 and v.pos.y + v.size.y/2 > DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 then
+                            if DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 > v.pos.x - v.size.x/2 and DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 < v.pos.x + v.size.x/2 then
+                                col = true
+                                
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not col then
+                        DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                            x = v2.pos.x,
+                            y = v2.pos.y,
+                            sx = v2.size.x,
+                            sy = v2.size.y,
+                            rot = formatdata["bottemtexture"].rotation or 0
+                        }
+                    end
+                end
+            end
+        end
+        
+        if formatdata["lefttexture"] then
+            local text = formatdata["lefttexture"].texture
+            
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+                DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+            end
+            
+            for k1, v2 in pairs(DEOC.objects) do
+                local name = v2.name
+                
+                if string.find(name, key) then
+                    local col = false
+                    
+                    for k, v in pairs(DEOC.objects) do
+                        if v.coll and v.name != name and v.pos.x + v.size.x/2 >= DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 and v.pos.x + v.size.x/2 < DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 then
+                            if DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 > v.pos.y - v.size.y/2 and DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 < v.pos.y + v.size.y/2 then
+                                col = true
+                                
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not col then
+                        DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                            x = v2.pos.x,
+                            y = v2.pos.y,
+                            sx = v2.size.x,
+                            sy = v2.size.y,
+                            rot = formatdata["lefttexture"].rotation or 0
+                        }
+                    end
+                end
+            end
+        end
+        
+        if formatdata["righttexture"] then
+            local text = formatdata["righttexture"].texture
+            
+            DEOV.objects[text] = DEOV.objects[text] or {}
+            
+            if not DEOV.textures[text] then
+                DEOV.textures[text] = render.getTextureID(text, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+                DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
+            end
+            
+            for k1, v2 in pairs(DEOC.objects) do
+                local name = v2.name
+                
+                if string.find(name, key) then
+                    local col = false
+                    
+                    for k, v in pairs(DEOC.objects) do
+                        if v.coll and v.name != name and v.pos.x - v.size.x/2 <= DEOC.objects[name].pos.x + DEOC.objects[name].size.x/2 and v.pos.x - v.size.x/2 > DEOC.objects[name].pos.x - DEOC.objects[name].size.x/2 then
+                            if DEOC.objects[name].pos.y + DEOC.objects[name].size.y/2 > v.pos.y - v.size.y/2 and DEOC.objects[name].pos.y - DEOC.objects[name].size.y/2 < v.pos.y + v.size.y/2 then
+                                col = true
+                                
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not col then
+                        DEOV.objects[text][#DEOV.objects[text] + 1] = {
+                            x = v2.pos.x,
+                            y = v2.pos.y,
+                            sx = v2.size.x,
+                            sy = v2.size.y,
+                            rot = formatdata["righttexture"].rotation or 0
+                        }
+                    end
+                end
+            end
+        end
+    end
+    
+    function DEOV.renderHitboxes()
+        for texture, v in pairs(DEOV.objects) do
+            render.setTexture(DEOV.textures[texture])
+            
+            for k, data in pairs(v) do
+                if data.uv1 then
+                    render.drawTexturedRectUV(data.x - data.sx/2 - sX, data.y -data.sy/2 - sY, data.sx, data.sy, data.uv1.x, data.uv1.y, data.uv2.x, data.uv2.y)
+                else
+                    render.drawTexturedRectRotated(data.x - sX, data.y - sY, data.sx, data.sy, data.rot)
+                end
+            end
+        end
+    end
+    
+    function DEOV.clearHitboxes()
+        DEOV.objects = {}
+    end
+end
+
+
+
+
+
+return DEOV

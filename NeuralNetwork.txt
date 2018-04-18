@@ -1,0 +1,320 @@
+local function softstep(value)
+    return 1 / (1 + math.exp(-value))
+end
+
+----------
+
+local neuralNetwork = {}
+neuralNetwork.__index = neuralNetwork
+
+function NeuralNetwork(data)
+    local self = setmetatable({}, neuralNetwork)
+    
+    self.nodes = {}
+    self.learnChance = 0.6 -- (0 - 1)
+    self.mutationChance = 0.1 -- (0 - 1)
+    self.mutationIntensity = 0.05 -- (0 - 1)
+    
+    for layer, amount in pairs(data) do
+        local weights
+        
+        if layer > 1 then
+            weights = {}
+            
+            for i = 1, data[layer - 1] do
+                weights[i] = 0
+            end
+        end
+        
+        self.nodes[layer] = {}
+        
+        for i = 1, amount do
+            self.nodes[layer][i] = {
+                value = 0,
+                weights = table.copy(weights)
+            }
+        end
+    end
+    
+    return self
+end
+
+function neuralNetwork:randomWeights()
+    for layer = 2, #self.nodes do
+        for node, data in pairs(self.nodes[layer]) do
+            for i, weight in pairs(data.weights) do
+                self.nodes[layer][node].weights[i] = math.rand(-100, 100) / 100
+            end
+        end
+    end
+end
+
+function neuralNetwork:run(input)
+    for layer, nodes in pairs(self.nodes) do
+        if layer == 1 then
+            for i, data in pairs(nodes) do
+                self.nodes[1][i].value = input[i]
+            end
+        else
+            for i, data in pairs(nodes) do
+                local value = 0
+                
+                for i2, weight in pairs(data.weights) do
+                    value = value + (self.nodes[layer - 1][i2].value * weight)
+                end
+                
+                self.nodes[layer][i].value = softstep(value)
+            end
+        end
+    end
+    
+    local output = {}
+    for k, v in pairs(self.nodes[table.count(self.nodes)]) do
+        table.insert(output, v.value)
+    end
+    
+    return output
+end
+
+function neuralNetwork:learn(generation, mutationOverwrite, mutationMul)
+    local parent1 = table.random(generation)
+    local parent2 = table.random(generation)
+    
+    for layer, nodes in pairs(self.nodes) do
+        if layer ~= 1 then
+            for node, data in pairs(nodes) do
+                for i, weight in pairs(data.weights) do
+                    local new = weight
+                    
+                    if math.random() < self.learnChance then
+                        new = (math.random() < 0.5 and parent1 or parent2)[layer][node].weights[i]
+                    end
+                    
+                    if math.random() < (mutationOverwrite or self.mutationChance) then
+                        new = math.clamp(new + math.rand(-1, 1) * (mutationMul or self.mutationIntensity), -1, 1)
+                    end
+                    
+                    self.nodes[layer][node].weights[i] = new
+                end
+            end
+        end
+    end
+end
+
+function neuralNetwork:getNodes()
+    return self.nodes
+end
+
+function neuralNetwork:setNodes(nodes)
+    self.nodes = table.copy(nodes)
+end
+
+----------
+
+local species = {}
+species.__index = species
+
+function Species(populationSize, neuralNetworkData)
+    local self = setmetatable({}, species)
+    
+    self.lastPopulation = {}
+    self.population = {}
+    self.scoreHistory = {}
+    self.forceMutationNextLearn = 0
+    self.successPercent = 0.1 -- (0 - 1) the percentage of the whole population sorted by score that will be used for futher breeding
+    self.noProgressMutationChance = 0.7 -- (0 - 1)
+    self.noProgressLookbackAmount = 5 -- Amount of generations looked back to determin if no progress has been done
+    self.noProgressMaxDiffrece = 20 -- Score diffrence to determin if no progress has been made
+    
+    for i = 1, populationSize do
+        local nn = NeuralNetwork(neuralNetworkData)
+        nn:randomWeights()
+        
+        table.insert(self.population, {
+            index = #self.population + 1,
+            nn = nn,
+            score = 0,
+            alive = true
+        })
+        
+        --print("--------------------------")
+        --printTable(nn.nodes)
+    end
+    
+    self.lastPopulation = table.copy(self.population)
+    
+    return self
+end
+
+function species:run(input)
+    local outputs = {}
+    
+    for i, data in pairs(self.population) do
+        if data.alive then
+            outputs[i] = data.nn:run(input[i])
+        end
+    end
+    
+    return outputs
+end
+
+function species:learn()
+    self.lastPopulation = table.copy(self.population)
+    
+    table.insert(self.scoreHistory, 1, self:getAvgScore())
+    local bigMutation, mutationMul
+    
+    if self.forceMutationNextLearn > 0 then
+        bigMutation = 1
+        mutationMul = self.forceMutationNextLearn
+        self.forceMutationNextLearn = 0
+    else
+        if #self.scoreHistory > self.noProgressLookbackAmount then
+            local min = 100000
+            local max = -100000
+            
+            for i = 1, self.noProgressLookbackAmount do
+                local score = self.scoreHistory[i]
+                
+                if score < min then min = score end
+                if score > max then max = score end
+            end
+            
+            print("progress diffrence: " .. (max - min))
+            
+            if max - min <= self.noProgressMaxDiffrece then
+                bigMutation = self.noProgressMutationChance
+                print("big mutation incomming")
+            end
+        end
+    end
+    
+    local mut
+    local sucnum = #self.population * self.successPercent
+    local goodnns = {}
+    local population = table.copy(self.population)
+    table.sortByMember(population, "score")
+    
+    for i, data in pairs(population) do
+        if i <= sucnum then
+            table.insert(goodnns, data.nn.nodes)
+        else
+            break
+        end
+    end
+    
+    for i, data in pairs(population) do
+        if i > sucnum then
+            self.population[data.index].nn:learn(goodnns, bigMutation, mutationMul)
+        end
+        
+        self.population[i].score = 0
+        self.population[i].alive = true
+    end
+end
+
+function species:setScore(nnindex, score)
+    self.population[nnindex].score = score
+end
+
+function species:setScoreAll(scoreAll)
+    for i, score in pairs(scoreAll) do
+        self:setScore(i, score)
+    end
+end
+
+function species:getAvgScore()
+    local score = 0
+    
+    for i, data in pairs(self.population) do
+        score = score + data.score
+    end
+    
+    return score / #self.population
+end
+
+function species:kill(nnindex)
+    self.population[nnindex].alive = false
+end
+
+function species:getAlive()
+    local alive = {}
+    
+    for i, data in pairs(self.population) do
+        if data.alive then
+            alive[i] = data
+        end
+    end
+    
+    return alive
+end
+
+function species:getAmountAlive()
+    local amount = 0
+    
+    for i, data in pairs(self.population) do
+        amount = amount + (data.alive and 1 or 0)
+    end
+    
+    return amount
+end
+
+function species:save(name, amount)
+    if not file.exists("neuralnetworks/") then
+        file.createDir("neuralnetworks")
+    end
+    
+    local folders = string.split(name, "/")
+    local curpath = "neuralnetworks"
+    for k, v in pairs(folders) do
+        if k < #folders then
+            curpath = curpath .. "/" .. v
+            
+            if not file.exists(curpath .. "/") then
+                file.createDir(curpath)
+            end
+        end
+    end
+    
+    if amount then
+        amount = tonumber(amount)
+    else
+        amount = math.round(#self.lastPopulation * self.successPercent)
+    end
+    
+    local nodes = {}
+    local population = table.copy(self.lastPopulation)
+    table.sortByMember(population, "score")
+    
+    for i, data in pairs(population) do
+        if i <= amount then
+            table.insert(nodes, data.nn.nodes)
+        else
+            break
+        end
+    end
+    
+    file.write("neuralnetworks/" .. name .. ".txt", json.encode(nodes))
+    print("Saved neuralnetwork " .. name .. (amount > 1 and (" with the top " .. amount ..  " best networks") or ""))
+end
+
+function species:load(name)
+    if not file.exists("neuralnetworks/" .. name .. ".txt") then
+        print("Unable to load invalid neuralnetwork " .. name)
+    end
+    
+    local nodes = json.decode(file.read("neuralnetworks/" .. name .. ".txt"))
+    
+    for k, v in pairs(self.population) do
+        self.population[k].nn.nodes = table.random(nodes)
+        self.population[k].score = math.random()
+        self.population[k].alive = false
+    end
+    
+    self.lastPopulation = table.copy(self.population)
+    self.scoreHistory = {}
+    self.forceMutationNextLearn = 0.1
+    
+    print("Loaded neuralnetwork " .. name)
+end
+

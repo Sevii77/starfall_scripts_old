@@ -1,0 +1,350 @@
+local Wire_Keyboard_Remap = {}
+
+----------------------------------------------------------------------
+-- Default - Keys that all layouts use
+----------------------------------------------------------------------
+
+local Wire_Keyboard_Remap_default = {}
+Wire_Keyboard_Remap_default.normal = {}
+Wire_Keyboard_Remap_default[KEY.LSHIFT] = {}
+Wire_Keyboard_Remap_default[KEY.RSHIFT] = Wire_Keyboard_Remap_default[KEY.LSHIFT]
+local remap = Wire_Keyboard_Remap_default.normal
+remap[KEY.NONE] = ""
+remap[KEY["0"]] = "0"
+remap[KEY["1"]] = "1"
+remap[KEY["2"]] = "2"
+remap[KEY["3"]] = "3"
+remap[KEY["4"]] = "4"
+remap[KEY["5"]] = "5"
+remap[KEY["6"]] = "6"
+remap[KEY["7"]] = "7"
+remap[KEY["8"]] = "8"
+remap[KEY["9"]] = "9"
+remap[KEY.A] = "a"
+remap[KEY.B] = "b"
+remap[KEY.C] = "c"
+remap[KEY.D] = "d"
+remap[KEY.E] = "e"
+remap[KEY.F] = "f"
+remap[KEY.G] = "g"
+remap[KEY.H] = "h"
+remap[KEY.I] = "i"
+remap[KEY.J] = "j"
+remap[KEY.K] = "k"
+remap[KEY.L] = "l"
+remap[KEY.M] = "m"
+remap[KEY.N] = "n"
+remap[KEY.O] = "o"
+remap[KEY.P] = "p"
+remap[KEY.Q] = "q"
+remap[KEY.R] = "r"
+remap[KEY.S] = "s"
+remap[KEY.T] = "t"
+remap[KEY.U] = "u"
+remap[KEY.V] = "v"
+remap[KEY.W] = "w"
+remap[KEY.X] = "x"
+remap[KEY.Y] = "y"
+remap[KEY.Z] = "z"
+remap[KEY.PAD_0] 		= "0"
+remap[KEY.PAD_1] 		= "1"
+remap[KEY.PAD_2] 		= "2"
+remap[KEY.PAD_3] 		= "3"
+remap[KEY.PAD_4] 		= "4"
+remap[KEY.PAD_5] 		= "5"
+remap[KEY.PAD_6] 		= "6"
+remap[KEY.PAD_7] 		= "7"
+remap[KEY.PAD_8] 		= "8"
+remap[KEY.PAD_9] 		= "9"
+remap[KEY.PAD_DIVIDE] 	= "/"
+remap[KEY.PAD_MULTIPLY] = "*"
+remap[KEY.PAD_MINUS] 	= "-"
+remap[KEY.PAD_PLUS] 	= "+"
+remap[KEY.PAD_ENTER] 	= 10
+remap[KEY.PAD_DECIMAL]  = "."
+remap[KEY.ENTER] 		= 10
+remap[KEY.SPACE] 		= " "
+remap[KEY.BACKSPACE] 	= 127
+remap[KEY.TAB] 			= 9
+remap[KEY.CAPSLOCK] 	= 144
+remap[KEY.NUMLOCK] 		= 145
+remap[KEY.ESCAPE] 		= 18
+remap[KEY.SCROLLLOCK] 	= 146
+remap[KEY.INSERT] 		= 147
+remap[KEY.DELETE] 		= 148
+remap[KEY.HOME] 		= 149
+remap[KEY.END] 			= 150
+remap[KEY.PAGEUP] 		= 151
+remap[KEY.PAGEDOWN] 	= 152
+remap[KEY.BREAK] 		= 153
+remap[KEY.LSHIFT] 		= 154
+remap[KEY.RSHIFT] 		= 155
+remap[KEY.LALT] 		= 156
+remap[KEY.RALT] 		= 157
+remap[KEY.LCONTROL] 	= 158
+remap[KEY.RCONTROL] 	= 159
+remap[KEY.LWIN] 		= 160
+remap[KEY.RWIN] 		= 161
+remap[KEY.APP] 			= 162
+remap[KEY.UP] 			= 17
+remap[KEY.LEFT] 		= 19
+remap[KEY.DOWN] 		= 18
+remap[KEY.RIGHT] 		= 20
+remap[KEY.F1] 			= 163
+remap[KEY.F2] 			= 164
+remap[KEY.F3] 			= 165
+remap[KEY.F4] 			= 166
+remap[KEY.F5] 			= 167
+remap[KEY.F6] 			= 168
+remap[KEY.F7] 			= 169
+remap[KEY.F8] 			= 170
+remap[KEY.F9] 			= 171
+remap[KEY.F10] 			= 172
+remap[KEY.F11] 			= 173
+remap[KEY.F12] 				= 174
+remap[KEY.CAPSLOCKTOGGLE]	= 175
+remap[KEY.NUMLOCKTOGGLE]	= 176
+remap[KEY.SCROLLLOCKTOGGLE]	= 177
+
+local remap = Wire_Keyboard_Remap_default[KEY.LSHIFT]
+remap[KEY.A] = "A"
+remap[KEY.B] = "B"
+remap[KEY.C] = "C"
+remap[KEY.D] = "D"
+remap[KEY.E] = "E"
+remap[KEY.F] = "F"
+remap[KEY.G] = "G"
+remap[KEY.H] = "H"
+remap[KEY.I] = "I"
+remap[KEY.J] = "J"
+remap[KEY.K] = "K"
+remap[KEY.L] = "L"
+remap[KEY.M] = "M"
+remap[KEY.N] = "N"
+remap[KEY.O] = "O"
+remap[KEY.P] = "P"
+remap[KEY.Q] = "Q"
+remap[KEY.R] = "R"
+remap[KEY.S] = "S"
+remap[KEY.T] = "T"
+remap[KEY.U] = "U"
+remap[KEY.V] = "V"
+remap[KEY.W] = "W"
+remap[KEY.X] = "X"
+remap[KEY.Y] = "Y"
+remap[KEY.Z] = "Z"
+
+----------------------------------------------------------------------
+-- American
+----------------------------------------------------------------------
+
+Wire_Keyboard_Remap.American = {}
+Wire_Keyboard_Remap.American = table.copy(Wire_Keyboard_Remap_default)
+Wire_Keyboard_Remap.American[KEY.RSHIFT] = Wire_Keyboard_Remap.American[KEY.LSHIFT]
+
+local remap = Wire_Keyboard_Remap.American.normal
+remap[KEY.LBRACKET] 	= "["
+remap[KEY.RBRACKET] 	= "]"
+remap[KEY.SEMICOLON] 	= ";"
+remap[KEY.APOSTROPHE] 	= "'"
+remap[KEY.BACKQUOTE] 	= "`"
+remap[KEY.COMMA] 		= ","
+remap[KEY.PERIOD] 		= "."
+remap[KEY.SLASH] 		= "/"
+remap[KEY.BACKSLASH] 	= "\\"
+remap[KEY.MINUS] 		= "-"
+remap[KEY.EQUAL] 		= "="
+
+local remap = Wire_Keyboard_Remap.American[KEY.LSHIFT]
+remap[KEY["0"]] = ")"
+remap[KEY["1"]] = "!"
+remap[KEY["2"]] = "@"
+remap[KEY["3"]] = "#"
+remap[KEY["4"]] = "$"
+remap[KEY["5"]] = "%"
+remap[KEY["6"]] = "^"
+remap[KEY["7"]] = "&"
+remap[KEY["8"]] = "*"
+remap[KEY["9"]] = "("
+remap[KEY.LBRACKET] 	= "{"
+remap[KEY.RBRACKET] 	= "}"
+remap[KEY.SEMICOLON] 	= ":"
+remap[KEY.APOSTROPHE] 	= '"'
+remap[KEY.COMMA] 		= "<"
+remap[KEY.PERIOD] 		= ">"
+remap[KEY.SLASH] 		= "?"
+remap[KEY.BACKSLASH] 	= "|"
+remap[KEY.MINUS] 		= "_"
+remap[KEY.EQUAL] 		= "+"
+
+----------------------------------------------------------------------
+-- British
+----------------------------------------------------------------------
+
+Wire_Keyboard_Remap.British = {}
+Wire_Keyboard_Remap.British = table.copy(Wire_Keyboard_Remap.American)
+Wire_Keyboard_Remap.British[KEY.LCONTROL] = {}
+Wire_Keyboard_Remap.British[KEY.RSHIFT] = Wire_Keyboard_Remap.British[KEY.LSHIFT]
+
+local remap = Wire_Keyboard_Remap.British.normal
+remap[KEY.BACKQUOTE] = "'"
+remap[KEY.APOSTROPHE] = "#"
+
+local remap = Wire_Keyboard_Remap.British[KEY.LSHIFT]
+remap[KEY["2"]] = '"'
+remap[KEY["3"]] = "£"
+remap[KEY.APOSTROPHE] = "~"
+remap[KEY.BACKQUOTE] = "@"
+
+local remap = Wire_Keyboard_Remap.British[KEY.LCONTROL]
+remap[KEY["4"]] = "€"
+remap[KEY.A] = "á"
+remap[KEY.E] = "é"
+remap[KEY.I] = "í"
+remap[KEY.O] = "ó"
+remap[KEY.U] = "ú"
+
+----------------------------------------------------------------------
+-- Swedish
+----------------------------------------------------------------------
+
+Wire_Keyboard_Remap.Swedish = {}
+Wire_Keyboard_Remap.Swedish = table.copy(Wire_Keyboard_Remap_default)
+Wire_Keyboard_Remap.Swedish[KEY.LCONTROL] = {} -- Should be KEY.RALT, but that didn't work correctly
+Wire_Keyboard_Remap.Swedish[KEY.RSHIFT] = Wire_Keyboard_Remap.Swedish[KEY.LSHIFT]
+
+local remap = Wire_Keyboard_Remap.Swedish.normal
+remap[KEY.LBRACKET] 	= "´"
+remap[KEY.RBRACKET] 	= "å"
+remap[KEY.BACKQUOTE] 	= "¨"
+remap[KEY.APOSTROPHE] 	= "ä"
+remap[KEY.SEMICOLON] 	= "ö"
+remap[KEY.COMMA] 		= ","
+remap[KEY.PERIOD] 		= "."
+remap[KEY.SLASH] 		= "'"
+remap[KEY.BACKSLASH] 	= "§"
+remap[KEY.MINUS] 		= "-"
+remap[KEY.EQUAL] 		= "+"
+
+local remap = Wire_Keyboard_Remap.Swedish[KEY.LSHIFT]
+remap[KEY["0"]] = "="
+remap[KEY["1"]] = "!"
+remap[KEY["2"]] = '"'
+remap[KEY["3"]] = "#"
+remap[KEY["4"]] = "¤"
+remap[KEY["5"]] = "%"
+remap[KEY["6"]] = "&"
+remap[KEY["7"]] = "/"
+remap[KEY["8"]] = "("
+remap[KEY["9"]] = ")"
+remap[KEY.LBRACKET] 	= "`"
+remap[KEY.RBRACKET] 	= "Å"
+remap[KEY.SEMICOLON] 	= 214 --"Ö"
+remap[KEY.BACKQUOTE] 	= "^" -- doesn't work because garry
+remap[KEY.APOSTROPHE] 	= "Ä"
+remap[KEY.COMMA] 		= ";"
+remap[KEY.PERIOD] 		= ":"
+remap[KEY.SLASH] 		= "*"
+remap[KEY.BACKSLASH] 	= "½"
+remap[KEY.MINUS] 		= "_"
+remap[KEY.EQUAL] 		= "?"
+
+local remap = Wire_Keyboard_Remap.Swedish[KEY.LCONTROL]
+remap[KEY["2"]] = "@"
+remap[KEY["3"]] = "£"
+remap[KEY["4"]] = "$"
+remap[KEY["7"]] = "{"
+remap[KEY["8"]] = "["
+remap[KEY["9"]] = "]"
+remap[KEY["0"]] = "}"
+remap[KEY.EQUAL] = "\\"
+remap[KEY.SEMICOLON] = "~"
+remap[KEY.E] = "€"
+
+----------------------------------------------------------------------
+-- Norwegian
+----------------------------------------------------------------------
+
+Wire_Keyboard_Remap.Norwegian = {}
+Wire_Keyboard_Remap.Norwegian = table.copy(Wire_Keyboard_Remap.Swedish)
+Wire_Keyboard_Remap.Norwegian[KEY.RSHIFT] = Wire_Keyboard_Remap.Norwegian[KEY.LSHIFT]
+
+local remap = Wire_Keyboard_Remap.Norwegian.normal
+remap[KEY.BACKQUOTE] 	= "ø"
+remap[KEY.APOSTROPHE] 	= "æ"
+remap[KEY.BACKSLASH] 	= "|"
+remap[KEY.LBRACKET] 	= "\\"
+
+local remap = Wire_Keyboard_Remap.Norwegian[KEY.LSHIFT]
+remap[KEY.BACKQUOTE] 	= "Ø"
+remap[KEY.APOSTROPHE] 	= "Æ"
+remap[KEY.BACKSLASH] 	= "§"
+
+local remap = Wire_Keyboard_Remap.Norwegian[KEY.LCONTROL]
+remap[KEY.EQUAL] = nil
+remap[KEY.M] = "µ"
+remap[KEY.LBRACKET] 		= "´"
+
+----------------------------------------------------------------------
+-- German
+----------------------------------------------------------------------
+
+Wire_Keyboard_Remap.German				= {}
+Wire_Keyboard_Remap.German				= table.copy(Wire_Keyboard_Remap_default)
+Wire_Keyboard_Remap.German[KEY.LCONTROL]			= {} -- Should be KEY.RALT, but that didn't work correctly
+Wire_Keyboard_Remap.German[KEY.RSHIFT]	= Wire_Keyboard_Remap.German[KEY.LSHIFT]
+
+local remap = Wire_Keyboard_Remap.German.normal
+remap[KEY.LBRACKET]		= "ß"
+remap[KEY.RBRACKET]		= "´"
+remap[KEY.SEMICOLON]	= "ü"
+remap[KEY.APOSTROPHE]	= "ä"
+remap[KEY.BACKQUOTE]	= "ö"
+remap[KEY.COMMA]		= ","
+remap[KEY.PERIOD]		= "."
+remap[KEY.SLASH]		= "#"
+remap[KEY.BACKSLASH]	= "^"
+remap[KEY.MINUS]		= "-"
+remap[KEY.EQUAL]		= "+"
+
+local remap = Wire_Keyboard_Remap.German[KEY.LSHIFT]
+remap[KEY["0"]]	= "="
+remap[KEY["1"]]	= "!"
+remap[KEY["2"]]	= '"'
+remap[KEY["3"]]	= "§"
+remap[KEY["4"]]	= "$"
+remap[KEY["5"]]	= "%"
+remap[KEY["6"]]	= "&"
+remap[KEY["7"]]	= "/"
+remap[KEY["8"]]	= "("
+remap[KEY["9"]]	= ")"
+remap[KEY.LBRACKET]		= "?"
+remap[KEY.RBRACKET]		= "`"
+remap[KEY.SEMICOLON]	= "Ü"
+remap[KEY.APOSTROPHE]	= 'Ä'
+remap[KEY.BACKQUOTE]	= "Ö"
+remap[KEY.COMMA]		= ";"
+remap[KEY.PERIOD]		= ":"
+remap[KEY.SLASH]		= "'"
+remap[KEY.BACKSLASH]	= "°"
+remap[KEY.MINUS]		= "_"
+remap[KEY.EQUAL]		= "*"
+
+local remap = Wire_Keyboard_Remap.German[KEY.LCONTROL]
+remap[KEY["0"]]	= "}"
+remap[KEY["2"]]	= '²'
+remap[KEY["3"]]	= "³"
+remap[KEY["7"]]	= "{"
+remap[KEY["8"]]	= "["
+remap[KEY["9"]]	= "]"
+remap[KEY.E]	= "€"
+remap[KEY.M]	= "µ"
+remap[KEY.Q]	= "@"
+remap[KEY.LBRACKET]		= '\\'
+remap[KEY.EQUAL]		= "~"
+remap[KEY.COMMA]		= "<"
+remap[KEY.PERIOD]		= ">"
+remap[KEY.MINUS]		= "|"
+
+
+return Wire_Keyboard_Remap

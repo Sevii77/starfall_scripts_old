@@ -1,0 +1,1060 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             GGGGGGGGGGGGG 222222222222222    
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        GGG::::::::::::G2:::::::::::::::22  
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    GG:::::::::::::::G2::::::222222:::::2 
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::O  G:::::GGGGGGGG::::G2222222     2:::::2 
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O G:::::G       GGGGGG            2:::::2 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OG:::::G                          2:::::2 
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OG:::::G                       2222::::2  
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OG:::::G    GGGGGGGGGG    22222::::::22   
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OG:::::G    G::::::::G  22::::::::222     
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OG:::::G    GGGGG::::G 2:::::22222        
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OG:::::G        G::::G2:::::2             
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O G:::::G       G::::G2:::::2             
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::O  G:::::GGGGGGGG::::G2:::::2       222222
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    GG:::::::::::::::G2::::::2222222:::::2
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        GGG::::::GGG:::G2::::::::::::::::::2
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             GGGGGG   GGGG22222222222222222222
+--  
+--  DaDam's Engine Of GUI (DEOG) A starfall DEOG engine
+
+--------------------
+
+--TODO: make everything into 1 table to fix rendering order
+
+DEOG = {}
+DEOG.libData = "2.03"
+
+local objects = {
+    colors = {
+        frame = Color(110, 110, 110),
+        console = Color(70, 70, 70),
+        buttonNormal = Color(90, 90, 90),
+        buttonHover = Color(70, 70, 70),
+        sliderBar = Color(70, 70, 70),
+        sliderCursor = Color(90, 90, 90),
+        text = Color(255, 255, 255),
+        entrytextText = Color(40, 40, 40),
+        entrytextText2 = Color(130, 130, 130),
+        scrollbarBar = Color(130, 130, 130),
+        scrollbarHandle = Color(70, 70, 70)
+    }, objects = {
+        objects = {},
+        crashScreen = function() end
+    }
+}
+
+local buttonKey, buttonKey2 = 15, -1
+local cursorX, cursorY
+local pos, cursor
+
+local function remov(ind)
+    if not objects.objects.objects[ind] then return end
+    local children = objects.objects.objects[ind].children
+    
+    if children then
+        for k, v in pairs(children) do
+            remov(v.ind)
+        end
+    end
+    
+    objects.objects.objects[ind] = nil
+end
+
+local data = {
+    frame = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                color = objects.colors.frame,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "frame",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.color)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, console = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                text = "",
+                color = objects.colors.frame,
+                insideColor = objects.colors.console,
+                textColor = objects.colors.text,
+                print = function(...)
+                    local text = ""
+                    
+                    local s = #{...}
+                    for k, v in pairs({...}) do
+                        text = text .. tostring(v)
+                        
+                        if k < s then
+                            text = text .. "    "
+                        end
+                    end
+                    
+                    objects.objects.objects[ind].text = text .. "\n" .. objects.objects.objects[ind].text
+                end,
+                clear = function()
+                    objects.objects.objects[ind].text = ""
+                    objects.objects.objects[ind].oldText = ""
+                    objects.objects.objects[ind].markup = {blocks = {}}
+                end,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "console",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.color)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                render.setColor(v.insideColor)
+                render.drawRect(v.pos.x + p.x + 2, v.pos.y + p.y + 2, v.size.x - 4, v.size.y - 4)
+            else
+                v.draw(v.pos + p)
+            end
+            
+            local w, h = render.getTextSize("ABC")
+            
+            if v.text != v.oldText then
+                objects.objects.objects[k].markup = render.parseMarkup(v.text, v.size.x - 10)
+                
+                local text = ""
+                
+                for i = 1, math.min(math.floor((v.size.y - 10) / h), table.count(v.markup.blocks)) do
+                    local v2 = v.markup.blocks[i]
+                    
+                    text = text .. v2.text .. "\n"
+                end
+                
+                objects.objects.objects[k].text = text
+                objects.objects.objects[k].oldText = text
+            end
+            
+            render.setColor(v.textColor)
+            
+            render.drawText(v.pos.x + p.x + 5, v.pos.y + p.y + 5, v.text)
+            
+            --[[for k2, v2 in pairs(v.markup.blocks) do
+                render.drawSimpleText(v.pos.x + 5 + v2.offset.x, v.pos.y + 5 + h*(k2-1), v2.text, 0, 0)
+            end]]
+        end,
+        inputPressed1 = function(k, v)
+            
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, label = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                text = "",
+                font = nil,
+                color = objects.colors.buttonNormal,
+                textColor = objects.colors.text,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "label",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.color)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                if v.font then
+                    render.setFont(v.font)
+                end
+                
+                render.setColor(v.textColor)
+                render.drawSimpleText(v.pos.x + p.x + v.size.x/2, v.pos.y + p.y + v.size.y/2, v.text, 1, 1)
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, button = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                text = "",
+                onPress = nil,
+                color = objects.colors.buttonNormal,
+                hoverColor = objects.colors.buttonHover,
+                textColor = objects.colors.text,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "button",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                if math.inrange(cursor, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                    render.setColor(v.hoverColor)
+                    
+                    if v.onHover then
+                        v.onHover()
+                        v.data.wasHover = true
+                    end
+                else
+                    render.setColor(v.color)
+                    
+                    if v.data.wasHover then
+                        if v.stopHover then
+                            v.stopHover()
+                        end
+                        
+                        v.data.wasHover = false
+                    end
+                end
+                
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                if v.font then
+                    render.setFont(v.font)
+                end
+                
+                render.setColor(v.textColor)
+                render.drawSimpleText(v.pos.x + p.x + v.size.x/2, v.pos.y + p.y + v.size.y/2, v.text, 1, 1)
+            else
+                if (v.onHover or v.stopHover) and math.inrange(cursor, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                    v.onHover()
+                    
+                    v.data.wasHover = true
+                elseif v.data.wasHover then
+                    if v.stopHover then
+                        v.stopHover()
+                    end
+                    
+                    v.data.wasHover = false
+                end
+                
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            if v.onPress then
+                local p, s = Vector(), Vector(math.huge, math.huge)
+                
+                if v.parent then
+                    local pd = objects.objects.objects[v.parent.ind]
+                    p, s = pd.pos, pd.size
+                    local parent = pd.parent
+                    
+                    while parent do
+                        p = p + objects.objects.objects[parent.ind].pos
+                        
+                        parent = objects.objects.objects[parent.ind].parent
+                    end
+                end
+                
+                if math.inrange(pos, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                    if v.hold then
+                        v.onPress(true)
+                    else
+                        v.onPress()
+                    end
+                end
+            end
+        end,
+        inputPressed2 = function(k, v)
+            if v.onPress2 then
+                local p, s = Vector(), Vector(math.huge, math.huge)
+                
+                if v.parent then
+                    local pd = objects.objects.objects[v.parent.ind]
+                    p, s = pd.pos, pd.size
+                    local parent = pd.parent
+                    
+                    while parent do
+                        p = p + objects.objects.objects[parent.ind].pos
+                        
+                        parent = objects.objects.objects[parent.ind].parent
+                    end
+                end
+                
+                if math.inrange(pos, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                    if v.hold then
+                        v.onPress2(true)
+                    else
+                        v.onPress2()
+                    end
+                end
+            end
+        end,
+        inputReleased1 = function(k, v)
+            if v.onPress and v.hold then
+                v.onPress(false)
+            end
+        end,
+        inputReleased2 = function(k, v)
+            if v.onPress2 and v.hold then
+                v.onPress2(false)
+            end
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, slider = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(40, 10),
+                parent = parent,
+                value = 1,
+                minValue = 1,
+                maxValue = 10,
+                onChange = nil,
+                round = false,
+                barColor = objects.colors.sliderBar,
+                cursorColor = objects.colors.sliderCursor,
+                textColor = objects.colors.text,
+                remove = function()
+                    remov(ind)
+                end,
+                setValue = function(value)
+                    local oldValue = objects.objects.objects[ind].value
+                    
+                    if objects.objects.objects[ind].round then
+                        objects.objects.objects[ind].value = math.round(value)
+                    else
+                        objects.objects.objects[ind].value = value
+                    end
+                    
+                    if value ~= oldValue then
+                        objects.objects.objects[ind].onChange(value)
+                    end
+                end,
+                data = {
+                    typ = "slider",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.holding and math.inrange(cursor, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                if v.round then
+                    objects.objects.objects[k].value = math.clamp(math.round((cursor.x - v.pos.x) / v.size.x * v.maxValue + v.minValue), v.minValue, v.maxValue)
+                else
+                    objects.objects.objects[k].value = math.clamp((cursor.x - p.x - v.pos.x) / v.size.x * v.maxValue + v.minValue, v.minValue, v.maxValue)
+                end
+                
+                v.onChange(v.value)
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.barColor)
+                render.drawRect(v.pos.x + p.x, v.pos.y + v.size.y/2 - 3 + p.y, v.size.x, 6)
+                
+                render.setColor(v.cursorColor)
+                render.drawRect(v.pos.x - 5 + (v.value - v.minValue) / (v.maxValue - v.minValue) * v.size.x + p.x, v.pos.y - v.size.y/2 + p.y, 5, v.size.y)
+                
+                render.setColor(v.textColor)
+                render.drawSimpleText(v.pos.x + v.size.x/2 + 5 + p.x, v.pos.y + v.size.y/2 + p.y, v.value .. "", 0, 1)
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+            end
+            
+            if math.inrange(pos, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                objects.objects.objects[k].holding = true
+            end
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            objects.objects.objects[k].holding = false
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, checkbox = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                text = "",
+                bordersize = 3,
+                bordersize2 = 1,
+                state = false,
+                onChange = nil,
+                color = objects.colors.buttonNormal,
+                textColor = objects.colors.text,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "checkbox",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.color)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                render.setColor(v.textColor)
+                render.drawSimpleText(v.pos.x + v.size.y + p.x, v.pos.y + v.size.y/2 + p.y, v.text, 0, 1)
+                render.drawRect(v.pos.x + v.bordersize + p.x, v.pos.y + v.bordersize + p.y, v.size.y - v.bordersize*2, v.size.y - v.bordersize*2)
+                
+                if v.state then
+                    render.setColor(Color(0, 255, 0))
+                    render.drawRect(v.pos.x + v.bordersize + v.bordersize2 + p.x, v.pos.y + v.bordersize + v.bordersize2 + p.y, v.size.y - v.bordersize*2 - v.bordersize2*2, v.size.y - v.bordersize*2 - v.bordersize2*2)
+                end
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            if v.onChange then
+                local p, s = Vector(), Vector(math.huge, math.huge)
+                
+                if v.parent then
+                    local pd = objects.objects.objects[v.parent.ind]
+                    p, s = pd.pos, pd.size
+                    local parent = pd.parent
+                    
+                    while parent do
+                        p = p + objects.objects.objects[parent.ind].pos
+                        
+                        parent = objects.objects.objects[parent.ind].parent
+                    end
+                end
+                
+                if math.inrange(pos, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                    objects.objects.objects[k].state = not v.state
+                    v.onChange(v.state)
+                end
+            end
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }, textentry = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 10),
+                parent = parent,
+                text = "",
+                holstertext = "",
+                bordersize = 1,
+                typing = false,
+                onChange = nil,
+                color = objects.colors.text,
+                colorOutline = objects.colors.buttonNormal,
+                textColor = objects.colors.entrytextText,
+                holstertextColor = objects.colors.entrytextText2,
+                remove = function()
+                    remov(ind)
+                end,
+                data = {
+                    typ = "textentry",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.colorOutline)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                render.setColor(v.color)
+                render.drawRect(v.pos.x + v.bordersize + p.x, v.pos.y + v.bordersize + p.y, v.size.x - v.bordersize*2, v.size.y - v.bordersize*2)
+                
+                local w, h = render.getTextSize("abc")
+                local f = (v.size.y - h)/2
+                
+                if #v.text == 0 then
+                    render.setColor(v.holstertextColor)
+                    render.drawSimpleText(v.pos.x + p.x + f, v.pos.y + p.y + v.size.y/2, v.holstertext, 0, 1)
+                else
+                    render.setColor(v.textColor)
+                    render.drawSimpleText(v.pos.x + p.x + f, v.pos.y + p.y + v.size.y/2, v.text, 0, 1)
+                end
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            objects.objects.objects[k].typing = false
+            
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+            end
+            
+            if math.inrange(pos, v.pos + p, math.min(v.pos + p + v.size, p + s)) then
+                objects.objects.objects[k].typing = true
+            end
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            if v.typing then
+                v.text = text
+                
+                v.onChange()
+                
+                v.typing = false
+            end
+        end
+    }, scrollbar = {
+        create = function(parent)
+            local ind = #objects.objects.objects + 1
+            
+            objects.objects.objects[ind] = {
+                pos = Vector(0, 0),
+                size = Vector(10, 40),
+                parent = parent,
+                onChange = nil,
+                panel = nil,
+                value = 0,
+                holding = false,
+                barColor = objects.colors.scrollbarBar,
+                handleColor = objects.colors.scrollbarHandle,
+                remove = function()
+                    remov(ind)
+                end,
+                setValue = function(value)
+                    local value = math.clamp(value, 0, 1)
+                    local old = objects.objects.objects[ind].value
+                    
+                    objects.objects.objects[ind].value = value
+                    
+                    if objects.objects.objects[ind].panel then
+                        local rat = objects.objects.objects[ind].panel.size.y / objects.objects.objects[ind].size.y
+                        
+                        objects.objects.objects[ind].panel.pos = objects.objects.objects[ind].panel.pos + Vector(0, (objects.objects.objects[ind].size.y * rat * (old - value)) / objects.objects.objects[ind].panel.size.y * (objects.objects.objects[ind].panel.size.y - objects.objects.objects[ind].size.y))
+                    end
+                    
+                    if objects.objects.objects[ind].onChange then
+                        objects.objects.objects[ind].onChange()
+                    end
+                end,
+                data = {
+                    typ = "scrollbar",
+                    ind = ind
+                }
+            }
+            
+            return objects.objects.objects[ind]
+        end,
+        render = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+                
+                --render.setScissor(p, pd.size)
+            else
+                --render.setScissor(Vector(), render.scrSize())
+            end
+            
+            if v.draw == nil then
+                render.setColor(v.barColor)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y, v.size.x, v.size.y)
+                
+                local rat = 1
+                local s = v.size.y
+                
+                if v.panel then
+                    rat = math.min(v.size.y / v.panel.size.y, 1)
+                    s = v.size.y * rat
+                    
+                    if v.holding then
+                        v.setValue(((cursorY - s) - v.pos.y) / (v.size.y - s*2))
+                    end
+                end
+                
+                render.setColor(v.handleColor)
+                render.drawRect(v.pos.x + p.x, v.pos.y + p.y + v.value * (v.size.y - s), v.size.x, s)
+            else
+                v.draw(v.pos + p)
+            end
+        end,
+        inputPressed1 = function(k, v)
+            local p, s = Vector(), Vector(math.huge, math.huge)
+            
+            if v.parent then
+                local pd = objects.objects.objects[v.parent.ind]
+                p, s = pd.pos, pd.size
+                local parent = pd.parent
+                
+                while parent do
+                    p = p + objects.objects.objects[parent.ind].pos
+                    
+                    parent = objects.objects.objects[parent.ind].parent
+                end
+            end
+            
+            if math.inrange(pos, v.pos + p, v.pos + p + v.size) then
+                v.holding = true
+            end
+        end,
+        inputPressed2 = function(k, v)
+            
+        end,
+        inputReleased1 = function(k, v)
+            v.holding = false
+        end,
+        inputReleased2 = function(k, v)
+            
+        end,
+        chat = function(k, v, text, isteam)
+            
+        end
+    }
+}
+
+hook.add("inputPressed", "DEOG_BUTTON", function(key)
+    if cursorX and cursorX > -1 and cursorY > -1 then
+        if key == buttonKey then
+            for k, v in pairs(objects.objects.objects) do
+                data[v.data.typ].inputPressed1(k, v)
+            end
+        elseif key == buttonKey2 then
+            for k, v in pairs(objects.objects.objects) do
+                data[v.data.typ].inputPressed2(k, v)
+            end
+        end
+    end
+end)
+
+hook.add("inputReleased", "DEOG_BUTTON", function(key)
+    if key == buttonKey then
+        for k, v in pairs(objects.objects.objects) do
+            data[v.data.typ].inputReleased1(k, v)
+        end
+    elseif key == buttonKey2 then
+        for k, v in pairs(objects.objects.objects) do
+            data[v.data.typ].inputReleased2(k, v)
+        end
+    end
+end)
+
+hook.add("playersay", "DEOG_CHAT", function(text, isteam)
+    for k, v in pairs(objects.objects.objects) do
+        data[v.data.typ].chat(k, v, text, isteam)
+    end
+end)
+
+--TODO: fix text entry
+--[[DEOG.keypressed = function(key)
+    if key == "backspace" then
+        for k, v in pairs(objects.objects.textentry) do
+            if v.typing then
+                local byteoffset = utf8.offset(v.text, -1)
+                
+                if byteoffset then
+                    objects.objects.textentry[k].text = string.sub(v.text, 1, byteoffset - 1)
+                    
+                    if v.onChange then
+                        v.onChange(objects.objects.textentry[k].text)
+                    end
+                end
+            end
+        end
+    end
+end
+
+DEOG.keyreleased = function(key)
+
+end
+
+DEOG.textinput = function(text)
+    for k, v in pairs(objects.objects.textentry) do
+        if v.typing then
+            objects.objects.textentry[k].text = v.text .. text
+            
+            if v.onChange then
+                v.onChange(objects.objects.textentry[k].text)
+            end
+        end
+    end
+end]]
+
+--------------------
+
+local crashscreenParms = {}
+local setCrashDestroy = true
+
+function DEOG.setCrashScreen(func)
+    objects.objects.crashScreen = func
+end
+
+function DEOG.setCrashDestroy(b)
+    setCrashDestroy = b
+end
+
+function DEOG.forceCrashScreen(...)
+    if setCrashDestroy then
+        for hookName, v in pairs(hook.getTable()) do
+            for name, func in pairs(v) do
+                hook.remove(hookName, name)
+            end
+        end
+        
+        for sound, v in pairs(bass.getTable()) do
+            sound:stop()
+        end
+        
+        DEOG.destroyAll()
+    end
+    
+    crashscreenParms = {...}
+    
+    hook.add("render", "DEOG_CRASHSCREEN", function()
+        objects.objects.crashScreen(unpack(crashscreenParms))
+    end)
+end
+
+function DEOG.checkCrash(maxPerf, ...)
+    if DEOL then
+        if quotaAverage() / quotaMax() > maxPerf then
+            DEOG.forceCrashScreen(...)
+            
+            return true
+        end
+        
+        return false
+    else
+        error("Woops! It seems like DEOL was not loaded correctly.")
+    end
+end
+
+--------------------
+
+function DEOG.setButton(b)
+    buttonKey = b
+end
+
+function DEOG.setButton2(b)
+    buttonKey2 = b
+end
+
+function DEOG.render(cursorposscale)
+    cursorposscale = cursorposscale or 1
+    
+    cursorX, cursorY = render.cursorPos()
+    cursorX = (cursorX or -1) / cursorposscale
+    cursorY = (cursorY or -1) / cursorposscale
+    cursor = Vector(cursorX, cursorY)
+    pos = cursor
+    
+    for k, v in pairs(objects.objects.objects) do
+        data[v.data.typ].render(k, v)
+    end
+end
+
+function DEOG.destroyAll()
+    objects.objects.objects = {}
+end
+
+--------------------
+
+function DEOG.create(obj, parent)
+    local par
+    
+    if parent then
+        par = {
+            typ = parent.data.typ,
+            ind = parent.data.ind
+        }
+    end
+    
+    local obj = data[obj].create(par)
+    
+    if parent then
+        objects.objects.objects[par.ind].children = objects.objects.objects[par.ind].children or {}
+        
+        table.insert(objects.objects.objects[par.ind].children, {
+            typ = obj.data.typ,
+            ind = obj.data.ind
+        })
+    end
+    
+    return obj
+end
+
+--------------------
+
+return DEOG

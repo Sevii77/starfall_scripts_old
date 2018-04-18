@@ -1,0 +1,707 @@
+--@include libs/keyboardlayout.txt
+
+local layout = require("libs/keyboardlayout.txt")
+
+--[[
+    SHIFT           79
+    RSHIFT          80
+    ALT             81
+    RALT            82
+    CTRL            83
+    RCTRL           84
+    TAB             67
+    BACKSPACE       66
+    DEL             73
+    ENTER           64
+    CAPSLOCKTOGGLE  104
+    CAPSLOCK        68
+    INS             72
+    SPACE           65
+    LEFTARROW       89
+    UPARROW         88
+    RIGHTARROW      91
+    DOWNARROW       90
+    MOUSE1          107
+    MOUSE2          108
+    A               11
+    Z               36
+    X               34
+    C               13
+    V               32
+]]
+
+local function backspace(self)
+    local line = self.lines[self.cursor.y]
+    
+    if self.cursor.x == 1 then
+        if self.cursor.y > 1 then
+            table.remove(self.lines, self.cursor.y)
+            
+            self.cursor.y = self.cursor.y - 1
+            self.cursor.x = #self.lines[self.cursor.y] + 1
+            self.lines[self.cursor.y] = self.lines[self.cursor.y] .. line
+        end
+    else
+        local amount = 1
+        
+        if (self.cursor.x - 1)%self.tabsize == 0 and string.sub(self.lines[self.cursor.y], self.cursor.x - self.tabsize, self.cursor.x - 1) == string.rep(" ", self.tabsize) then
+            amount = self.tabsize
+        end
+        
+        self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1 - amount) .. string.sub(line, self.cursor.x)
+        self.cursor.x = self.cursor.x - amount
+    end
+end
+
+local specialKeys = {
+    [79] = {    --SHIFT
+        press = function(self)
+            self.shift = true
+        end,
+        release = function(self)
+            self.shift = false
+        end,
+        dontremoveselected = true
+    }, [80] = { --RSHIFT
+        press = function(self)
+            self.shift = true
+        end,
+        release = function(self)
+            self.shift = false
+        end,
+        dontremoveselected = true
+    }, [81] = { --ALT
+        press = function(self)
+            self.alt = true
+        end,
+        release = function(self)
+            self.alt = false
+        end,
+        dontremoveselected = true
+    }, [82] = { --RALT
+        press = function(self)
+            self.alt = true
+        end,
+        release = function(self)
+            self.alt = false
+        end,
+        dontremoveselected = true
+    }, [83] = { --CTRL
+        press = function(self)
+            self.ctrl = true
+        end,
+        release = function(self)
+            self.ctrl = false
+        end,
+        dontremoveselected = true
+    }, [84] = { --RCTRL
+        press = function(self)
+            self.ctrl = true
+        end,
+        release = function(self)
+            self.ctrl = false
+        end,
+        dontremoveselected = true
+    }, [67] = { --TAB
+        press = function(self)
+            local line = self.lines[self.cursor.y]
+            local amount = self.tabsize - (self.cursor.x - 1)%self.tabsize
+            
+            self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. string.rep(" ", amount) .. string.sub(line, self.cursor.x)
+            
+            self.cursor.x = self.cursor.x + amount
+        end,
+        release = function(self)
+            
+        end
+    }, [66] = { --BACKSPACE
+        press = function(self)
+            backspace(self)
+        end,
+        release = function(self)
+            
+        end,
+        dontwhenselect = true
+    }, [73] = { --DEL
+        press = function(self)
+            local line = self.lines[self.cursor.y]
+            
+            if self.cursor.x > #line and self.cursor.y < #self.lines then
+                table.remove(self.lines, self.cursor.y)
+            else
+                local amount = 1
+                
+                if (self.cursor.x - 1)%self.tabsize == 0 and string.sub(self.lines[self.cursor.y], self.cursor.x, self.cursor.x + self.tabsize - 1) == string.rep(" ", self.tabsize) then
+                    amount = self.tabsize
+                end
+                
+                self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. string.sub(line, self.cursor.x + amount)
+            end
+        end,
+        release = function(self)
+            
+        end,
+        dontwhenselect = true
+    }, [64] = { --ENTER
+        press = function(self)
+            local tabs = ""
+            
+            self.lines[self.cursor.y] = self.lines[self.cursor.y] or ""
+            
+            if self.autotab then
+                do
+                    local s, e = string.find(self.lines[self.cursor.y], "[ ]+")
+                    if s and s == 1 then
+                        e = math.min(e, self.cursor.x)
+                        tabs = string.rep(" ", e - e%self.tabsize)
+                    end
+                end
+                
+                do
+                    local s, e = string.find(self.lines[self.cursor.y], "then")
+                    local s2, e2 = string.find(self.lines[self.cursor.y], "do")
+                    local s3, e3 = string.find(self.lines[self.cursor.y], "{")
+                    
+                    s = s or s2 or s3
+                    e = e or e2 or e3
+                    
+                    if s and string.sub(self.lines[self.cursor.y], e + 1, #self.lines[self.cursor.y]) == string.rep(" ", #self.lines[self.cursor.y] - e) then
+                        tabs = tabs .. string.rep(" ", self.tabsize)
+                    end
+                end
+            end
+            
+            local new = tabs .. string.sub(self.lines[self.cursor.y], self.cursor.x)
+            self.lines[self.cursor.y] = string.sub(self.lines[self.cursor.y], 1, self.cursor.x - 1)
+            
+            self.cursor.x = #tabs + 1
+            self.cursor.y = self.cursor.y + 1
+            
+            table.insert(self.lines, self.cursor.y, new)
+        end,
+        release = function(self)
+            
+        end
+    }, [104] = {--CAPSLOCKTOGGLE
+        press = function(self)
+            self.caps = not self.caps
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [68] = { --CAPSLOCK
+        press = function(self)
+            self.caps = not self.caps
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [72] = { --INS
+        press = function(self)
+            self.insert = not self.insert
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, --[[[65] = { --SPACE
+        press = function(self)
+            if self.insert then
+                local line = self.lines[self.cursor.y]
+                
+                self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. " " .. string.sub(line, self.cursor.x + 1)
+                
+                self.cursor.x = self.cursor.x + 1
+            else
+                local line = self.lines[self.cursor.y]
+                
+                self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. " " .. string.sub(line, self.cursor.x)
+                
+                self.cursor.x = self.cursor.x + 1
+            end
+        end,
+        release = function(self)
+            
+        end
+    },]] [89] = { --LEFTARROW
+        press = function(self)
+            if self.shift then
+                if self.selectpoint == nil then
+                    self.selectpoint = {x = self.cursor.x, y = self.cursor.y}
+                end
+            elseif self.selectpoint then
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+                
+                return
+            end
+            
+            if self.cursor.x > 1 then
+                local amount = 1
+                
+                if (self.cursor.x - 1)%self.tabsize == 0 and string.sub(self.lines[self.cursor.y], self.cursor.x - self.tabsize, self.cursor.x - 1) == string.rep(" ", self.tabsize) then
+                    amount = self.tabsize
+                end
+                
+                self.cursor.x = self.cursor.x - amount
+            elseif self.cursor.y > 1 then
+                self.cursor.y = self.cursor.y - 1
+                self.cursor.x = #self.lines[self.cursor.y] + 1
+            end
+            
+            if self.shift then
+                self.selectpoint2 = {x = self.cursor.x, y = self.cursor.y}
+            end
+            
+            self.drawCursor = true
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [88] = { --UPARROW
+        press = function(self)
+            if self.shift then
+                if self.selectpoint == nil then
+                    self.selectpoint = {x = self.cursor.x, y = self.cursor.y}
+                end
+            elseif self.selectpoint then
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+                
+                return
+            end
+            
+            if self.cursor.y > 1 then
+                self.cursor.y = self.cursor.y - 1
+                self.cursor.x = math.clamp(self.cursor.x, 1, #self.lines[self.cursor.y] + 1)
+                self.drawCursor = true
+            end
+            
+            if self.shift then
+                self.selectpoint2 = {x = self.cursor.x, y = self.cursor.y}
+            end
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [91] = { --RIGHTARROW
+        press = function(self)
+            if self.shift then
+                if self.selectpoint == nil then
+                    self.selectpoint = {x = self.cursor.x, y = self.cursor.y}
+                end
+            elseif self.selectpoint then
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+                
+                return
+            end
+            
+            if self.cursor.x < (#self.lines[self.cursor.y] + 1) then
+                local amount = 1
+                
+                if (self.cursor.x - 1)%self.tabsize == 0 and string.sub(self.lines[self.cursor.y], self.cursor.x, self.cursor.x + self.tabsize - 1) == string.rep(" ", self.tabsize) then
+                    amount = self.tabsize
+                end
+                
+                self.cursor.x = self.cursor.x + amount
+            elseif self.cursor.y < #self.lines then
+                self.cursor.y = self.cursor.y + 1
+                self.cursor.x = 1
+            end
+            
+            if self.shift then
+                self.selectpoint2 = {x = self.cursor.x, y = self.cursor.y}
+            end
+            
+            self.drawCursor = true
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [90] = { --DOWNARROW
+        press = function(self)
+            if self.shift then
+                if self.selectpoint == nil then
+                    self.selectpoint = {x = self.cursor.x, y = self.cursor.y}
+                end
+            elseif self.selectpoint then
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+                
+                return
+            end
+            
+            if self.cursor.y < (#self.lines) then
+                self.cursor.y = self.cursor.y + 1
+                
+                if self.cursor.y <= #self.lines then
+                    self.cursor.x = math.clamp(self.cursor.x, 1, #self.lines[self.cursor.y] + 1)
+                end
+                
+                self.drawCursor = true
+            end
+            
+            if self.shift then
+                self.selectpoint2 = {x = self.cursor.x, y = self.cursor.y}
+            end
+        end,
+        release = function(self)
+            
+        end,
+        dontremoveselected = true
+    }, [11] = { --A
+        ctrl = function(self)
+            self.selectpoint = {x = 1, y = 1}
+            self.selectpoint2 = {x = #self.lines[#self.lines] + 1, y = #self.lines}
+            self.cursor = {x = #self.lines[#self.lines] + 1, y = #self.lines}
+        end
+    }, [34] = { --X
+        ctrl = function(self)
+            if self.selectpoint then
+                local p1, p2 = self.selectpoint, self.selectpoint2
+                
+                if p2.y < p1.y then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                end
+                
+                if p1.y == p2.y then
+                    self.clipboard = {string.sub(self.lines[p1.y], p2.x, p1.x - 1)}
+                else
+                    self.clipboard = {
+                        string.sub(self.lines[p1.y], p1.x)
+                    }
+                    
+                    for i = p1.y + 1, p2.y - 1 do
+                        table.insert(self.clipboard, string.sub(self.lines[i], 1, #self.lines[i]))
+                    end
+                    
+                    table.insert(self.clipboard, string.sub(self.lines[p2.y], 1, p2.x - 1))
+                end
+                
+                ----------
+                
+                local p1, p2 = self.selectpoint, self.selectpoint2
+                
+                if p2.y < p1.y then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                elseif p2.y == p1.y and p2.x < p1.x then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                end
+                
+                self.cursor = {x = p2.x, y = p2.y}
+                
+                local c = 0
+                
+                if self.selectpoint2.y == self.selectpoint.y then
+                    c = p2.x - p1.x
+                else
+                    c = c + (#self.lines[p1.y] - p1.x)
+                    
+                    for i = p1.y + 1, p2.y - 1 do
+                        c = c + #self.lines[i] + 1
+                    end
+                    
+                    c = c + p2.x + 1
+                end
+                
+                for i = 1, c do
+                    backspace(self)
+                end
+                
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+            end
+        end
+    }, [13] = { --C
+        ctrl = function(self)
+            if self.selectpoint then
+                local p1, p2 = self.selectpoint, self.selectpoint2
+                
+                if p2.y < p1.y then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                elseif p2.y == p1.y and p2.x < p1.x then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                end
+                
+                if p1.y == p2.y then
+                    self.clipboard = {string.sub(self.lines[p1.y], p1.x, p2.x - 1)}
+                else
+                    self.clipboard = {
+                        string.sub(self.lines[p1.y], p1.x)
+                    }
+                    
+                    for i = p1.y + 1, p2.y - 1 do
+                        table.insert(self.clipboard, string.sub(self.lines[i], 1, #self.lines[i]))
+                    end
+                    
+                    table.insert(self.clipboard, string.sub(self.lines[p2.y], 1, p2.x - 1))
+                end
+            end
+        end
+    }, [32] = { --V
+        ctrl = function(self)
+            if self.selectpoint then
+                local p1, p2 = self.selectpoint, self.selectpoint2
+                
+                if p2.y < p1.y then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                elseif p2.y == p1.y and p2.x < p1.x then
+                    p2 = self.selectpoint
+                    p1 = self.selectpoint2
+                end
+                
+                self.cursor = {x = p2.x, y = p2.y}
+                
+                local c = 0
+                
+                if self.selectpoint2.y == self.selectpoint.y then
+                    c = p2.x - p1.x
+                else
+                    c = c + (#self.lines[p1.y] - p1.x)
+                    
+                    for i = p1.y + 1, p2.y - 1 do
+                        c = c + #self.lines[i] + 1
+                    end
+                    
+                    c = c + p2.x + 1
+                end
+                
+                for i = 1, c do
+                    backspace(self)
+                end
+                
+                self.selectpoint = nil
+                self.selectpoint2 = nil
+            end
+            
+            if #self.clipboard == 1 then
+                self.lines[self.cursor.y] = string.sub(self.lines[self.cursor.y], 1, self.cursor.x - 1) .. self.clipboard[1] .. string.sub(self.lines[self.cursor.y], self.cursor.x)
+                self.cursor.x = self.cursor.x + #self.clipboard[1]
+            else
+                local e = string.sub(self.lines[self.cursor.y], self.cursor.x)
+                
+                self.lines[self.cursor.y] = string.sub(self.lines[self.cursor.y], 1, self.cursor.x - 1) .. self.clipboard[1]
+                
+                for i = 2, #self.clipboard - 1 do
+                    table.insert(self.lines, self.cursor.y + i - 1, self.clipboard[i])
+                end
+                
+                table.insert(self.lines, self.cursor.y + #self.clipboard, self.clipboard[#self.clipboard] .. e)
+                
+                self.cursor = {x = #self.lines[self.cursor.y + #self.clipboard] + 1, y = self.cursor.y + #self.clipboard - 1}
+            end
+        end
+    }, [36] = {
+        ctrl = function(self)
+            if #self.history > 0 then
+                self.lines = table.copy(self.history[#self.history])
+                table.remove(self.history, #self.history)
+            end
+        end,
+        dontdohistory = true
+    }
+}
+
+local Editor = {}
+Editor.__index = Editor
+
+function Editor:new()
+    local self = setmetatable({}, Editor)
+    
+    self.cursor = {x = 1, y = 1}
+    self.lines = {""}
+    self.drawCursor = true
+    self.curKeyDown = nil
+    self.nextAutoKey = 0
+    self.caps = false
+    self.shift = false
+    self.ctrl = false
+    self.alt = false
+    self.insert = false
+    self.keyboard = "American"
+    self.tabsize = 4
+    self.clipboard = {""}
+    self.history = {}
+    self.autotab = true
+    self.onInput = nil
+    
+    local tbl = {}
+    
+    for k, v in pairs(layout) do
+        table.insert(tbl, k)
+    end
+    
+    self.validlayouts = tbl
+    
+    hook.add("think", tostring(self), function()
+        if self.curKeyDown and self.nextAutoKey <= timer.curtime() then
+            self:input(self.curKeyDown)
+        end
+    end)
+    
+    return self
+end
+
+function Editor:input(key)
+    local char = layout[self.keyboard].normal[key]
+    
+    if self.shift ~= self.caps and layout[self.keyboard][KEY.LSHIFT][key] then
+        char = layout[self.keyboard][KEY.LSHIFT][key]
+    elseif self.ctrl and self.alt and layout[self.keyboard][KEY.LCONTROL] and layout[self.keyboard][KEY.LCONTROL][key] then
+        char = layout[self.keyboard][KEY.LCONTROL][key]
+    end
+    
+    if self.ctrl and specialKeys[key] and specialKeys[key].ctrl then
+        specialKeys[key].ctrl(self)
+    elseif specialKeys[key] and specialKeys[key].press then
+        if not specialKeys[key].dontwhenselect or self.selectpoint == nil then
+            specialKeys[key].press(self)
+        end
+        
+        if not specialKeys[key].dontremoveselected and self.selectpoint then
+            local p1, p2 = self.selectpoint, self.selectpoint2
+            
+            if p2.y < p1.y then
+                p2 = self.selectpoint
+                p1 = self.selectpoint2
+            elseif p2.y == p1.y and p2.x < p1.x then
+                p2 = self.selectpoint
+                p1 = self.selectpoint2
+            end
+            
+            self.cursor = {x = p2.x, y = p2.y}
+            
+            local c = 0
+            
+            if self.selectpoint2.y == self.selectpoint.y then
+                c = p2.x - p1.x
+            else
+                c = c + (#self.lines[p1.y] - p1.x)
+                
+                for i = p1.y + 1, p2.y - 1 do
+                    c = c + #self.lines[i] + 1
+                end
+                
+                c = c + p2.x + 1
+            end
+            
+            for i = 1, c do
+                backspace(self)
+            end
+            
+            self.selectpoint = nil
+            self.selectpoint2 = nil
+        end
+        
+        if not specialKeys[key].dontdohistory then
+            if #self.history == 10 then table.remove(self.history, 1) end
+            table.insert(self.history, self.lines)
+        end
+    elseif type(char) == "string" and #char == 1 then
+        if self.selectpoint then
+            local p1, p2 = self.selectpoint, self.selectpoint2
+            
+            if p2.y < p1.y then
+                p2 = self.selectpoint
+                p1 = self.selectpoint2
+            elseif p2.y == p1.y and p2.x < p1.x then
+                p2 = self.selectpoint
+                p1 = self.selectpoint2
+            end
+            
+            self.cursor = {x = p2.x, y = p2.y}
+            
+            local c = 0
+            
+            if self.selectpoint2.y == self.selectpoint.y then
+                c = p2.x - p1.x
+            else
+                c = c + (#self.lines[p1.y] - p1.x)
+                
+                for i = p1.y + 1, p2.y - 1 do
+                    c = c + #self.lines[i] + 1
+                end
+                
+                c = c + p2.x + 1
+            end
+            
+            for i = 1, c do
+                backspace(self)
+            end
+            
+            self.selectpoint = nil
+            self.selectpoint2 = nil
+        end
+        
+        if self.insert then
+            local line = self.lines[self.cursor.y]
+            
+            self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. char .. string.sub(line, self.cursor.x + 1)
+            
+            self.cursor.x = self.cursor.x + 1
+        else
+            local line = self.lines[self.cursor.y]
+            
+            self.lines[self.cursor.y] = string.sub(line, 1, self.cursor.x - 1) .. char .. string.sub(line, self.cursor.x)
+            
+            self.cursor.x = self.cursor.x + 1
+        end
+        
+        if #self.history == 10 then table.remove(self.history, 1) end
+        table.insert(self.history, self.lines)
+    end
+    
+    if key ~= self.curKeyDown then
+        self.curKeyDown = key
+        self.nextAutoKey = timer.curtime() + 0.4
+    else
+        self.nextAutoKey = timer.curtime() + 0.05
+    end
+    
+    if self.onInput then
+        self.onInput(key)
+    end
+end
+
+function Editor:release(key)
+    if specialKeys[key] and specialKeys[key].press then
+        specialKeys[key].release(self)
+    end
+    
+    if key == self.curKeyDown then
+        self.curKeyDown = nil
+        self.nextAutoKey = 0
+    end
+end
+
+function Editor:setCode(s)
+    self.lines = string.explode("\n", s)
+end
+
+function Editor:getCode()
+    local tbl = {}
+    
+    for k, v in pairs(self.lines) do
+        if v then
+            table.insert(tbl, v)
+        end
+    end
+    
+    self.lines = tbl
+    
+    return table.concat(self.lines, "\n")
+end
+
+return Editor
