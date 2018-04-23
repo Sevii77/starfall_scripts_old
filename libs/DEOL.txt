@@ -160,7 +160,7 @@ function hook.runOnce(hookName, func)
 end
 
 --CLIENT CHAT HOOK
-if SERVER then
+--[[if SERVER then
     hook.add("PlayerSay", "CLIENTSIDE_PLAYERSAY", function(ply, text, isTeam)
         net.start("CLIENTSIDE_PLAYERSAY")
         net.writeString(text)
@@ -173,7 +173,7 @@ else
             hook.call("PlayerSay", net.readString(), (net.readBit() and true or false))
         end
     end)
-end
+end]]
 
 --------------------
 --TIMER
@@ -326,6 +326,7 @@ if CLIENT then
             end
         end
         
+        local totalSize = {x = 0, y = tbl[#tbl].pos.y + tbl[#tbl].size.y}
         local tbl2 = {}
         for _, line in pairs(tbl) do
             local pos = line.pos
@@ -346,6 +347,8 @@ if CLIENT then
                     table.insert(tbl2[_].text, v)
                 end
             end
+            
+            totalSize.x = math.max(totalSize.x, line.size.x)
         end
         
         return function(x, y)
@@ -356,7 +359,7 @@ if CLIENT then
                     render.drawText(x + line.pos.x + v.x, y + line.pos.y, v.text)
                 end
             end
-        end
+        end, totalSize
     end
     
     --cached version of render.getTextureID()

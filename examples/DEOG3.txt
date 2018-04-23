@@ -1,0 +1,90 @@
+--@name DEOG3 test
+--@client
+--@include libs/DEOG3.txt
+
+local gui = require("libs/DEOG3.txt")
+
+gui.registerElement("betterbutton", "button" --[[here we inherit from button so we can make our own better button without making it all in itself]], {
+    settings = {
+        text = "Better Button",
+        size = Vector(100, 20)
+    }, onClick = function(self)
+        if self.hovering then
+            self.pos = self.pos + Vector(math.random(-self.size.x, self.size.x), math.random(-self.size.y, self.size.y))
+            self.onClick(self)
+        end
+    end
+})
+
+--This is so we can do gui.button(parent) instead of gui.create("button", button)
+gui.createConstructors(--[[pass true in here to make global constructors: Button(parent) ]])
+
+----------
+
+local button = gui.button()
+button:setPos(Vector(50, 50))
+button:setSize(Vector(140, 40))
+button:setText("hello there")
+function button:drawOver(size)
+    render.setColor(self.colorBorder)
+    
+    render.drawRect(-2, -2, 4, 4)
+    render.drawRect(size.x - 2, -2, 4, 4)
+    render.drawRect(-2, size.y - 2, 4, 4)
+    render.drawRect(size.x - 2, size.y - 2, 4, 4)
+end
+
+local label = gui.create("label")
+label.pos = Vector(50, 100)
+label.size = Vector(140, 40)
+
+local betterbutton = gui.betterbutton()
+betterbutton.pos = Vector(50, 200)
+betterbutton.size = Vector(100, 60)
+betterbutton.onClick = function(self)
+    label.text = tostring(betterbutton:getPos())
+end
+
+local checkbox = gui.create("checkbox")
+checkbox.pos = Vector(50, 150)
+checkbox.size = Vector(140, 30)
+
+for i = 0, 4 do
+    local frame = gui.create("frame")
+    frame.pos = Vector(50 + i*20, 300 + i*20)
+    frame.colorBorder = Color(i/4*300, 1, 1):hsvToRGB()
+end
+
+local container = gui.create("container")
+container.pos = Vector(300, 0)
+container.size = Vector(200, 1024*8)
+
+local slidervalue = gui.create("label", container)
+slidervalue.pos = Vector(50, 80)
+
+local slider = gui.create("slider", container)
+slider.pos = Vector(50, 50)
+slider.round = 2.5
+slider.min = -10
+slider.max = 10
+slider.onChange = function(self, value)
+    slidervalue.text = tostring(value)
+end
+
+local scrollbar = gui.create("scrollbar")
+scrollbar.pos = Vector(500, 0)
+scrollbar.size = Vector(12, 512)
+scrollbar.contentLength = 1024*8
+scrollbar.onChange = function(self, scrollLength)
+    container.pos.y = -scrollLength
+end
+
+----------
+
+hook.add("render", "", function()
+    render.setBackgroundColor(Color(100, 160, 220))
+    
+    gui.think()
+    gui.render()
+    --gui.debug()
+end)
