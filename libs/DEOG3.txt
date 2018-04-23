@@ -19,13 +19,15 @@ local buttonsDown = {
     TODO:
     
     add arrows to scrollbar
+    add panel textentry
 ]]
 
 local defaultFont = render.createFont("roboto", 18, 800)
 local defaultSettings = {
     enabled = true,
     pos = Vector(),
-    size = Vector(100, 30)
+    size = Vector(100, 30),
+    childOffset = Vector()
 }
 local defaultMethods = {
     focus = function(self)
@@ -147,6 +149,8 @@ function gui.isMouseOnPanel(panel)
     
     return false
 end
+
+gui.isCursorOnPanel = gui.isMouseOnPanel
 
 function gui.isPointOnPanel(panel, point, min, max)
     local point = gui.getGlobalPos(panel, point)
@@ -354,7 +358,7 @@ function gui.render()
         
         if #obj.children > 0 then
             for i, v in pairs(obj.children) do
-                renderObject(v, offset + obj.panel.pos)
+                renderObject(v, offset + obj.panel.pos + obj.panel.childOffset)
             end
         end
     end
@@ -378,7 +382,7 @@ function gui.debug()
         
         if #obj.children > 0 then
             for i, v in pairs(obj.children) do
-                renderObject(v, offset + obj.panel.pos)
+                renderObject(v, offset + obj.panel.pos + obj.panel.childOffset)
             end
         end
     end
@@ -441,6 +445,8 @@ gui.registerElement("frame", "container", {
                 self.pos = self.pos + cursor - self.grabOffset
             end
         end
+        
+        self.childOffset = Vector(self.borderSize, self.headSize)
     end,
     onDraw = function(self)
         self.draw(self, self.size)
@@ -451,7 +457,9 @@ gui.registerElement("frame", "container", {
         
         if gui.isPointOnPanel(self, cursor, Vector(), Vector(self.size.x, self.headSize)) then
             self.grabOffset = cursor
-            
+        end
+        
+        if gui.isCursorOnPanel(self) then
             self:focus()
         end
     end,

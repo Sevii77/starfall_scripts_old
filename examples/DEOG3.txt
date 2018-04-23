@@ -53,6 +53,9 @@ for i = 0, 4 do
     local frame = gui.create("frame")
     frame.pos = Vector(50 + i*20, 300 + i*20)
     frame.colorBorder = Color(i/4*300, 1, 1):hsvToRGB()
+    
+    local label = gui.create("label", frame)
+    label.size = Vector(50, 30)
 end
 
 local container = gui.create("container")
