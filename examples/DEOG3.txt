@@ -58,6 +58,7 @@ for i = 0, 4 do
     label.size = Vector(50, 30)
 end
 
+-----Scrollbar-----
 local container = gui.create("container")
 container.pos = Vector(300, 0)
 container.size = Vector(200, 1024*8)
@@ -72,6 +73,19 @@ slider.min = -10
 slider.max = 10
 slider.onChange = function(self, value)
     slidervalue.text = tostring(value)
+end
+
+local textentry = gui.create("textentry", container)
+textentry.pos = Vector(50, 150)
+
+local buttongrid = gui.create("buttongrid", container)
+buttongrid.pos = Vector(20, 200)
+buttongrid.size = Vector(170, math.huge)
+buttongrid.buttonSize = Vector(50, 30)
+buttongrid.spacing = Vector(10, 10)
+buttongrid.onClick = function(self, index) print("btton " .. index) end
+for i = 1, 1000 do
+    buttongrid:addButton(tostring(i))
 end
 
 local scrollbar = gui.create("scrollbar")
