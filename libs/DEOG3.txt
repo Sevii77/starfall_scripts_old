@@ -1,12 +1,35 @@
-local function printConsole(...)local c={}for d=1,select("#",...)do c[d]=tostring(select(d,...))end printMessage(2,table.concat(c," ").."\n")end
-
 local gui = {
     elements = {},
     leftClickButtons = {[107] = true, [15] = true},
     rightClickButtons = {[108] = true},
-    doubleClickTime = 0.5
+    doubleClickTime = 0.5,
+    visabilityUpdate = 0.1,
+    useServerPlayerSay = true
 }
 
+
+if SERVER then
+    if net.dataReceive then
+        hook.add("playerSay", "", function(ply, text)
+            if not gui.useServerPlayerSay then return end
+            
+            net.sendData("DEOG3", text, ply)
+        end)
+    else
+        hook.add("playerSay", "", function(ply, text)
+            if not gui.useServerPlayerSay then return end
+            
+            net.start("DEOG3")
+            net.writeString(text)
+            net.send(ply)
+        end)
+    end
+    
+    return
+end
+
+
+local removeBuffer = {}
 local objects = {}
 local cursorPos
 local buttonsDown = {
@@ -20,6 +43,7 @@ local buttonsDown = {
     
     add arrows to scrollbar
     add panel textentry
+    add panel scrollregion
 ]]
 
 local defaultFont = render.createFont("roboto", 18, 800)
@@ -27,7 +51,9 @@ local defaultSettings = {
     enabled = true,
     pos = Vector(),
     size = Vector(100, 30),
-    childOffset = Vector()
+    childOffset = Vector(),
+    onScreen = false,
+    solid = true
 }
 local defaultMethods = {
     focus = function(self)
@@ -77,6 +103,30 @@ local function drawRoundedRect(cornersize, quality, x, y, w, h)
     render.drawPoly(poly)
 end
 
+local function removeObject(data)
+    for i, v in pairs(data.children) do
+        removeObject(v)
+    end
+    
+    if data.parent then
+        for i, v in pairs(gui.getCoreData(data.parent).children) do
+            if v.panel == data.panel then
+                table.remove(gui.getCoreData(data.parent).children, i)
+                
+                break
+            end
+        end
+    else
+        for i, v in pairs(objects) do
+            if v.panel == data.panel then
+                table.remove(objects, i)
+                
+                break
+            end
+        end
+    end
+end
+
 ------------------------------
 
 hook.add("inputPressed", "DEOG3", function(key)
@@ -116,10 +166,42 @@ hook.add("inputReleased", "DEOG3", function(key)
     end
 end)
 
+hook.add("playerChat", "DEOG3", function(ply, text)
+    if gui.useServerPlayerSay or ply ~= player() then return end
+    
+    gui.callFunc("onChat", text)
+end)
+
+timer.create("DEOG3", gui.visabilityUpdate, 0, function()
+    local x, y = render.getResolution()
+    
+    if not x then return end
+    
+    for k, v in pairs(gui.getCorrectOrder()) do
+        local pos = gui.getGlobalPos(v.obj.panel)
+        
+        v.obj.panel.onScreen = pos.y < y and pos.y + v.obj.panel.size.y > 0 and pos.x < x and pos.x + v.obj.panel.size.x > 0
+    end
+end)
+
+if net.dataReceive then --DEOM2
+    net.dataReceive("DEOG3", function(text)
+        gui.callFunc("onChat", text)
+    end)
+else
+    net.receive("DEOG3", function()
+        gui.callFunc("onChat", net.readString())
+    end)
+end
+
 ------------------------------
 
 function gui.getCursorPos(panel)
     return cursorPos.x == -1 and cursorPos or gui.getLocalPos(panel, cursorPos)
+end
+
+function gui.getCursorPosGlobal()
+    return cursorPos
 end
 
 function gui.getGlobalPos(panel, offset)
@@ -128,7 +210,7 @@ function gui.getGlobalPos(panel, offset)
     if not parent then
         return panel.pos + (offset and offset or Vector())
     else
-        return gui.getGlobalPos(parent, panel.pos + (offset or Vector()))
+        return gui.getGlobalPos(parent, panel.pos + (offset or Vector()) + parent.childOffset)
     end
 end
 
@@ -136,13 +218,13 @@ function gui.getLocalPos(panel, pos)
     return pos - gui.getGlobalPos(panel)
 end
 
-function gui.isMouseOnPanel(panel)
+function gui.isCursorOnPanel(panel)
     local point = cursorPos
     
     if point.x == -1 then return false end
     
     for k, v in pairs(gui.getCorrectOrder()) do
-        if point.x > v.pos.x and point.y > v.pos.y and point.x < v.pos.x + v.obj.panel.size.x and point.y < v.pos.y + v.obj.panel.size.y then
+        if (v.obj.panel.solid or v.obj.panel == panel) and point.x > v.pos.x and point.y > v.pos.y and point.x < v.pos.x + v.obj.panel.size.x and point.y < v.pos.y + v.obj.panel.size.y then
             return v.obj.panel == panel
         end
     end
@@ -150,18 +232,16 @@ function gui.isMouseOnPanel(panel)
     return false
 end
 
-gui.isCursorOnPanel = gui.isMouseOnPanel
-
 function gui.isPointOnPanel(panel, point, min, max)
     local point = gui.getGlobalPos(panel, point)
     
     for k, v in pairs(gui.getCorrectOrder()) do
         if v.obj.panel == panel then
             if point.x > v.pos.x + min.x and point.y > v.pos.y + min.y and point.x < v.pos.x + max.x and point.y < v.pos.y + max.y then
-                return v.obj.panel == panel
+                return true
             end
         else
-            if point.x > v.pos.x and point.y > v.pos.y and point.x < v.pos.x + v.obj.panel.size.x and point.y < v.pos.y + v.obj.panel.size.y then
+            if v.obj.panel.solid and point.x > v.pos.x and point.y > v.pos.y and point.x < v.pos.x + v.obj.panel.size.x and point.y < v.pos.y + v.obj.panel.size.y then
                 return false
             end
         end
@@ -174,6 +254,8 @@ function gui.getCorrectOrder()
     local data = {}
     
     local function doObject(obj, offset)
+        --if not obj.panel.enabled or not obj.panel.onScreen then return end
+        
         table.insert(data, 1, {
             obj = obj,
             pos = offset + obj.panel.pos
@@ -181,7 +263,7 @@ function gui.getCorrectOrder()
         
         if #obj.children > 0 then
             for i, v in pairs(obj.children) do
-                doObject(v, offset + obj.panel.pos)
+                doObject(v, offset + obj.panel.pos + obj.panel.childOffset)
             end
         end
     end
@@ -193,13 +275,13 @@ function gui.getCorrectOrder()
     return data
 end
 
-function gui.callFunc(func)
+function gui.callFunc(func, ...)
     for k, v in pairs(gui.getCorrectOrder()) do
         --[[if v.functions[func] and v.panel.enabled then
             v.functions[func](v.panel)
         end]]
-        if v.obj.panel.enabled and gui.elements[v.obj.typ].functions[func] then
-            gui.elements[v.obj.typ].functions[func](v.obj.panel)
+        if v.obj.panel.enabled and v.obj.panel.onScreen and gui.elements[v.obj.typ].functions[func] then
+            gui.elements[v.obj.typ].functions[func](v.obj.panel, ...)
         end
     end
 end
@@ -220,10 +302,12 @@ function gui.registerElement(name, inherit, data)
         inherit = nil
         
         for k, v in pairs(defaultSettings) do
-            data.settings[k] = v
+            if data.settings[k] == nil then
+                data.settings[k] = v
+            end
         end
     else
-        if not gui.elements[inherit] then error("DEOG3: tried to create invalid gui element with inherit type of " .. inherit) end
+        if not gui.elements[inherit] then error("DEOG3: tried to create gui element with invalid inherit type of " .. inherit) end
         
         data.settings = data.settings or {}
         local newdata = table.copy(gui.elements[inherit].coredata)
@@ -235,8 +319,20 @@ function gui.registerElement(name, inherit, data)
             end
         end
         
-        for name, v in pairs(data.settings) do
-            newdata.settings[name] = v
+        if data.settings then
+            newdata.settings = newdata.settings or {}
+            
+            for name, v in pairs(data.settings) do
+                newdata.settings[name] = v
+            end
+        end
+        
+        if data.methods then
+            newdata.methods = newdata.methods or {}
+            
+            for name, v in pairs(data.methods) do
+                newdata.methods[name] = v
+            end
         end
         
         data = newdata
@@ -252,16 +348,24 @@ function gui.registerElement(name, inherit, data)
         end
     end
     
-    for name, v in pairs(data.settings) do
-        local lname = name
-        
-        if type(v) == "function" then
-            panel[lname] = function(self, func) self[lname] = func end
-        else
-            local raisedName = string.upper(lname[1]) .. string.sub(lname, 2)
+    if data.settings then
+        for name, v in pairs(data.settings) do
+            local lname = name
             
-            panel["get" .. raisedName] = function(self) return self[lname] end
-            panel["set" .. raisedName] = function(self, value) self[lname] = value end
+            if type(v) == "function" then
+                panel[lname] = function(self, func) self[lname] = func end
+            else
+                local raisedName = string.upper(lname[1]) .. string.sub(lname, 2)
+                
+                panel["get" .. raisedName] = function(self) return self[lname] end
+                panel["set" .. raisedName] = function(self, value) self[lname] = value end
+            end
+        end
+    end
+    
+    if data.methods then
+        for name, v in pairs(data.methods) do
+            panel[name] = v
         end
     end
     
@@ -280,8 +384,18 @@ end
 function gui.create(typ, parent)
     if not gui.elements[typ] then error("DEOG3: tried to create invalid gui element type of " .. typ) end
     
+    local paneltable = {}
+    
+    for k, v in pairs(gui.elements[typ].panel) do
+        if type(v) == "table" then
+            paneltable[k] = table.copy(v)
+        else
+            paneltable[k] = v
+        end
+    end
+    
     local data = {
-        panel = setmetatable({}, gui.elements[typ].panel),
+        panel = setmetatable({}, paneltable),
         typ = typ,
         --functions = {},
         children = {},
@@ -297,23 +411,7 @@ function gui.create(typ, parent)
     end
     
     function data.panel:remove()
-        if data.parent then
-            for i, v in pairs(gui.getCoreData(data.parent).children) do
-                if v.panel == data.panel then
-                    table.remove(i)
-                    
-                    break
-                end
-            end
-        end
-        
-        for i, v in pairs(objects) do
-            if v == data.panel then
-                table.remove(objects, i)
-                
-                break
-            end
-        end
+        table.insert(removeBuffer, data)
     end
     
     if parent then
@@ -345,11 +443,19 @@ function gui.think()
     local x, y = render.cursorPos()
     cursorPos = Vector(x or -1, y or -1)
     
+    while #removeBuffer > 0 do
+        removeObject(removeBuffer[1])
+        
+        table.remove(removeBuffer, 1)
+    end
+    
     gui.callFunc("onThink")
 end
 
 function gui.render()
     local function renderObject(obj, offset)
+        if not obj.panel.enabled or not obj.panel.onScreen then return end
+        
         local matrix = Matrix()
         matrix:setTranslation(offset + obj.panel.pos)
         render.pushMatrix(matrix)
@@ -370,7 +476,7 @@ function gui.render()
     end
 end
 
-function gui.debug()
+--[[function gui.debug()
     render.setColor(Color(255, 0, 0))
     
     local function renderObject(obj, offset)
@@ -392,7 +498,7 @@ function gui.debug()
         
         renderObject(v, Vector())
     end
-end
+end]]
 
 ------------------------------
 
@@ -419,12 +525,11 @@ gui.registerElement("container", {
 -----Frame-----
 gui.registerElement("frame", "container", {
     settings = {
-        colorText = Color(50, 50, 50),
+        colorText = Color(220, 220, 220),
         size = Vector(100, 125),
         headSize = 25,
         font = defaultFont,
         title = "Frame",
-        showClosebutton = true,
         grabOffset = nil,
         draw = function(self, size)
             render.setColor(self.colorBorder)
@@ -437,7 +542,16 @@ gui.registerElement("frame", "container", {
             render.drawSimpleText(self.size.x/2, self.headSize/2, self.title, 1, 1)
         end,
         drawOver = function(self, size) end
-    }, onThink = function(self)
+    }, onCreate = function(self)
+        self.closebutton = gui.create("button", self)
+        --self.closebutton.pos = Vector(385, -24)
+        --self.closebutton.size = Vector(23, 23)
+        self.closebutton.text = "X"
+        self.closebutton.onClick = function()
+            self:remove()
+        end
+    end,
+    onThink = function(self)
         if self.grabOffset then
             local cursor = gui.getCursorPos(self)
             
@@ -447,6 +561,11 @@ gui.registerElement("frame", "container", {
         end
         
         self.childOffset = Vector(self.borderSize, self.headSize)
+        
+        if self.closebutton then
+            self.closebutton.pos = Vector(self.size.x - self.borderSize - self.headSize + 1, -self.headSize + 1)
+            self.closebutton.size = Vector(self.headSize - 2, self.headSize - 2)
+        end
     end,
     onDraw = function(self)
         self.draw(self, self.size)
@@ -525,7 +644,7 @@ gui.registerElement("button", "label", {
         drawOver = function(self, size) end
     }, onThink = function(self)
         local lastHover = self.hovering
-        self.hovering = gui.isMouseOnPanel(self)
+        self.hovering = gui.isCursorOnPanel(self)
         
         if lastHover ~= self.hovering then
             if self.hovering then
@@ -572,6 +691,120 @@ gui.registerElement("button", "label", {
     end
 })
 
+-----Button Grid-----
+gui.registerElement("buttongrid", "button", {
+    settings = {
+        size = Vector(210, math.huge),
+        buttonSize = Vector(100, 30),
+        spacing = Vector(5, 5),
+        buttons = {},
+        useScissorRect = false,
+        text = nil,
+        hovering = false,
+        mouseLeftDown = false,
+        mouseRightDown = false,
+        maxX = 0,
+        draw = function(self, index, pos, size)
+            render.setColor(self.colorBorder)
+            render.drawRect(pos.x, pos.y, size.x, size.y)
+            
+            render.setColor((self.mouseLeftDown == index or self.mouseRightDown == index) and self.colorClick or (self.hovering == index and self.colorHover or self.color))
+            render.drawRect(pos.x + self.borderSize, pos.y + self.borderSize, size.x - self.borderSize*2, size.y - self.borderSize*2)
+            
+            render.setColor(self.colorText)
+            render.setFont(self.font)
+            render.drawSimpleText(pos.x + size.x/2, pos.y + size.y/2, self.buttons[index], 1, 1)
+        end
+    }, methods = {
+        addButton = function(self, text)
+            table.insert(self.buttons, text)
+        end
+    }, onThink = function(self)
+        local lastHover = self.hovering
+        local pos = gui.getCursorPos(self)
+        local size = self.buttonSize + self.spacing
+        
+        self.maxX = math.floor((self.size.x + self.spacing.x) / size.x)
+        
+        if gui.isCursorOnPanel(self) then
+            if pos.x < 0 or pos.x > self.maxX * size.x then
+                self.hovering = false
+            else
+                if pos.x % size.x > self.buttonSize.x or pos.y % size.y > self.buttonSize.y then
+                    self.hovering = false
+                else
+                    self.hovering = 1 + math.floor(pos.x / size.x) + (math.floor(pos.y / size.y) * self.maxX)
+                    
+                    if self.hovering < 1 or self.hovering > #self.buttons then
+                        self.hovering = false
+                    end
+                end
+            end
+        else
+            self.hovering = false
+        end
+        
+        if lastHover ~= self.hovering then
+            if self.hovering then
+                self.onHoverBegin(self, self.hovering)
+            else
+                self.onHoverEnd(self, lastHover)
+            end
+        elseif self.hovering then
+            self.onHover(self, self.hovering)
+        end
+    end,
+    onDraw = function(self)
+        local gpos = gui.getGlobalPos(self)
+        local size = self.buttonSize
+        local sw, sh = render.getResolution()
+        
+        if self.useScissorRect then
+            render.enableScissorRect(gpos.x, gpos.y, gpos.x + self.size.x, gpos.y + self.size.y)
+        end
+        
+        for i = math.max(1, math.floor(-gpos.y / (size.y + self.spacing.y)) * self.maxX + 1), math.min(#self.buttons, math.floor((-gpos.y + sh + (size.y + self.spacing.y)) / (size.y + self.spacing.y)) * self.maxX) do
+            local pos = Vector(((i - 1) % self.maxX) * (size.x + self.spacing.x), math.floor((i - 1) / self.maxX) * (size.y + self.spacing.y))
+            
+            self.draw(self, i, pos, size)
+            self.drawOver(self, i, pos, size)
+        end
+        
+        if self.useScissorRect then
+            render.disableScissorRect()
+        end
+    end,
+    onClick = function(self)
+        if self.hovering then
+            self.mouseLeftDown = self.hovering
+            self.onClick(self, self.hovering)
+        end
+    end,
+    onRightClick = function(self)
+        if self.hovering then
+            self.mouseRightDown = self.hovering
+            self.onRightClick(self, self.hovering)
+        end
+    end,
+    onDoubleClick = function(self)
+        if self.hovering then
+            self.onDoubleClick(self, self.hovering)
+        end
+    end,
+    onRelease = function(self)
+        if self.mouseLeftDown then
+            self.onRelease(self, self.mouseLeftDown)
+            self.mouseLeftDown = false
+        end
+    end,
+    onRightRelease = function(self)
+        if self.mouseRightDown then
+            self.onRightRelease(self, self.mouseRightDown)
+            self.mouseRightDown = false
+        end
+    end
+})
+
 -----Checkbox-----
 gui.registerElement("checkbox", {
     settings = {
@@ -599,6 +832,7 @@ gui.registerElement("checkbox", {
     }, onCreate = function(self)
         self.label = gui.create("label", self)
         self.label.text = "Checkbox"
+        self.label.solid = false
     end,
     onThink = function(self)
         if self.state then
@@ -619,9 +853,74 @@ gui.registerElement("checkbox", {
         self.drawOver(self, self.size)
     end,
     onClick = function(self)
-        if gui.isMouseOnPanel(self) then
+        if gui.isCursorOnPanel(self) then
             self.state = not self.state
             self.onChange(self, self.state)
+        end
+    end
+})
+
+-----Text Entry-----
+gui.registerElement("textentry", "label", {
+    settings = {
+        text = "",
+        textEmpty = "textentry",
+        selected = false,
+        lastFont = nil, --Used for left side allignment
+        textOffset = 0, --Used for left side allignment
+        onClick = function(self) end,
+        onChange = function(self, text) end,
+        draw = function(self, size)
+            render.setColor(self.colorBorder)
+            render.drawRect(0, 0, size.x, size.y)
+            
+            render.setColor(self.color)
+            render.drawRect(self.borderSize, self.borderSize, size.x - self.borderSize*2, size.y - self.borderSize*2)
+            
+            local isEmpty = self.text == ""
+            render.setColor(isEmpty and Color(self.colorText.r, self.colorText.g, self.colorText.b, 100) or self.colorText)
+            render.setFont(self.font)
+            render.drawSimpleText(self.textOffset, size.y/2, isEmpty and self.textEmpty or self.text, 0, 1)
+            
+            if self.selected and math.round(timer.curtime())%2 == 1 then
+                render.setColor(self.colorBorder)
+                render.drawRect(self.borderSize*2, self.borderSize*2, self.borderSize, self.size.y - self.borderSize*4)
+            end
+        end,
+    }, onDraw = function(self)
+        if self.font ~= self.lastFont then
+            self.lastFont = self.font
+            
+            render.setFont(self.font)
+            local w, h = render.getTextSize(" ")
+            
+            self.textOffset = (self.size.y - h) / 2
+        end
+        
+        self.draw(self, self.size)
+        self.drawOver(self, self.size)
+    end,
+    onClick = function(self)
+        if gui.isCursorOnPanel(self) then
+            self.selected = true
+            
+            self.onClick(self)
+        else
+            self.selected = false
+        end
+    end,
+    onChat = function(self, text)
+        if self.selected then
+            local s, e = string.find(text, "[ ]+")
+            
+            if s == 1 then
+                text = string.sub(text, e + 1)
+            end
+            
+            self.text = text
+            self.selected = false
+            
+            self.onChange(self, text)
         end
     end
 })
@@ -679,9 +978,46 @@ gui.registerElement("slider", "label", {
         self.drawOver(self, self.size)
     end,
     onClick = function(self)
-        if gui.isMouseOnPanel(self) then
+        if gui.isCursorOnPanel(self) then
             self.holding = true
         end
+    end,
+    onRelease = function(self)
+        self.holding = false
+    end
+})
+
+-----Scrollframe-----
+gui.registerElement("scrollframe", {
+    settings = {
+        slowdown = 7,
+        vel = 0,
+        solid = false,
+        holding = false,
+        lastCursorPos = Vector(),
+        onChange = function(self, value) end
+    }, onThink = function(self)
+        local pos = gui.getCursorPos(self)
+        
+        if pos.x == -1 then
+            self.holding = false
+        end
+        
+        if self.holding then
+            self.vel = pos.y - self.lastCursorPos.y
+        end
+        
+        if self.vel ~= 0 then
+            self.onChange(self, self.vel)
+            
+            self.vel = math.max(0, math.abs(self.vel) - timer.frametime() * self.slowdown) * (self.vel / math.abs(self.vel))
+        end
+        
+        self.lastCursorPos = pos
+    end,
+    onDraw = function() end,
+    onClick = function(self)
+        self.holding = gui.isCursorOnPanel(self)
     end,
     onRelease = function(self)
         self.holding = false
@@ -756,9 +1092,15 @@ gui.registerElement("scrollbar", "button", {
             
             return free, frac, barFrac, size, length
         end
+    }, methods = {
+        scroll = function(self, value)
+            self.scrollLength = math.clamp(self.scrollLength + value, 0, self.contentLength - self.size.y)
+            
+            self.onChange(self, self.scrollLength)
+        end
     }, onThink = function(self)
         local lastHover = self.hovering
-        self.hovering = gui.isMouseOnPanel(self)
+        self.hovering = gui.isCursorOnPanel(self)
         
         if lastHover ~= self.hovering then
             if self.hovering then
@@ -779,6 +1121,9 @@ gui.registerElement("scrollbar", "button", {
         if self.dragging then
             local free,frac,barFrac,size,length = self:calcBar()
             local pos = gui.getCursorPos(self)
+            
+            if pos.x == -1 then return end
+            
             local v = 1 - barFrac
             local u = self.isVertical and (pos.y / (self.size.y * v)) or (pos.x / (self.size.x * v))
             local offset = self.barGrabFrac * barFrac * self.contentLength
@@ -789,7 +1134,14 @@ gui.registerElement("scrollbar", "button", {
             if last ~= self.scrollLength then
                 self.onChange(self, self.scrollLength)
             end
+            
+            if self.contentLength ~= self.lastContentLength then
+                self.mouseLeftDown = false
+                self.dragging = false
+            end
         end
+        
+        self.lastContentLength = self.contentLength
     end,
     onDraw = function(self)
         self.draw(self, self.size)
@@ -800,7 +1152,7 @@ gui.registerElement("scrollbar", "button", {
             self.mouseLeftDown = true
         end
         
-        if gui.isMouseOnPanel(self) then
+        if gui.isCursorOnPanel(self) then
             local free, frac, barFrac, size = self:calcBar()
             local pos = gui.getCursorPos(self)
             local u = self.isVertical and (pos.y / self.size.y) or (pos.x / self.size.x)

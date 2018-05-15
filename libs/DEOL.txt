@@ -107,6 +107,15 @@ function perf(n, max)
     return math.max(quotaAverage(), quotaUsed()) < math.min(quotaMax(), max) * n
 end
 
+function printConsole(...)
+    local c = {}
+    
+    for d = 1, select("#", ...) do
+        c[d] = tostring(select(d, ...))
+    end
+    
+    printMessage(2, table.concat(c, " ") .. "\n")
+end
 
 --------------------
 --HOOK
@@ -263,6 +272,28 @@ if CLIENT then
         return activeColor
     end
     
+    function render.drawRoundedRect(cornersize, quality, x, y, w, h)
+        local poly = {}
+        
+        local function corner(x, y, ang)
+            for i = 0, quality - 1 do
+                local rad = math.rad(ang + i / (quality - 1) * 90)
+                
+                table.insert(poly, {
+                    x = x + math.cos(rad) * cornersize,
+                    y = y + math.sin(rad) * cornersize
+                })
+            end
+        end
+        
+        corner(x + cornersize, y + cornersize, 180)
+        corner(x + w - cornersize, y + cornersize, 270)
+        corner(x + w - cornersize, y + h - cornersize, 0)
+        corner(x + cornersize, y + h - cornersize, 90)
+        
+        render.drawPoly(poly)
+    end
+    
     --[[
         usage example:
         render.formatText({
@@ -362,6 +393,82 @@ if CLIENT then
         end, totalSize
     end
     
+    function render.limitText(text, maxWidth)
+        if render.getTextSize(text) < maxWidth then
+            return text
+        end
+        
+        while true do
+            text = string.sub(text, 1, #text - 1)
+            
+            if #text <= 1 then
+                return "Can't limit text"
+            end
+            
+            if render.getTextSize(text .. "...") < maxWidth then
+                return text .. "..."
+            end
+        end
+    end
+    
+    --Combines multiple images into 1
+    function render.getTextureIDs(urls)
+        local texture = render.getTextureID("https://image-combiner-o1eem006zok7.runkit.sh/" .. string.replace(table.concat(urls, "~"), "/", "$"))
+        local uvs = {}
+        local size = math.ceil(math.sqrt(#urls))
+        
+        for k, v in pairs(urls) do
+            local uv = Vector(((k - 1)%size) / size, math.floor((k - 1) / size) / size)
+            
+            uvs[k] = {
+                uv1 = uv,
+                uv2 = uv + Vector(1 / size, 1 / size)
+            }
+        end
+        
+        return texture, uvs
+    end
+    
+    --Fixed render.getRenderTargetMaterial
+    local rts = {}
+    
+    local renderCreateRenderTarget = render.createRenderTarget
+    function render.createRenderTarget(name)
+        renderCreateRenderTarget(name)
+        
+        if rts[name] then
+            rts[name]:destroy()
+        end
+        
+        local m = material.create("VertexLitGeneric")
+        m:setInt("$model", 1)
+        m:setTextureRenderTarget("$basetexture", name)
+        
+        rts[name] = m
+    end
+    
+    local renderDestroyTexture = render.destroyTexture
+    function render.destroyTexture(name)
+        if not rts[name] then return end
+        
+        renderDestroyTexture(name)
+        
+        rts[name]:destroy()
+        rts[name] = nil
+    end
+    
+    function render.getRenderTargetMaterial(name)
+        if not rts[name] then return end
+        
+        return "!" .. rts[name]:getName()
+    end
+    
+    --[[
+        oh please: add credits oh please 
+        oh please: to getTextureID 
+        oh please: or I'll deploy my ICBLs (intercontential ballistic lawyers)
+        oh please: and sue you to afterdeath 
+    ]]
     --cached version of render.getTextureID()
     --manages an internal cache of textures, so that cached textures are not reloaded
     --Returns:
@@ -369,7 +476,7 @@ if CLIENT then
     --             * and calls callback when texture is ready
     -- on failure: 1. nil
     local textureCache = {} --[url] = {lastUsed=lastUsed, tx=tx, ready=ready}
-    function getTextureID(url, cb, align, skip_hack)
+    function render.getTextureIDCached(url, cb, align, skip_hack)
         local cached = textureCache[url]
         if cached then --if texture is in cache, we may immediately return it
             local lastUsed = timer.curtime()
