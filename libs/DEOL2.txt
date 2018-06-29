@@ -1,0 +1,42 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     LLLLLLLLLLL              222222222222222    
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   L:::::::::L             2:::::::::::::::22  
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO L:::::::::L             2::::::222222:::::2 
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OLL:::::::LL             2222222     2:::::2 
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O  L:::::L                           2:::::2 
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  L:::::L                           2:::::2 
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O  L:::::L                        2222::::2  
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O  L:::::L                   22222::::::22   
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::O  L:::::L                 22::::::::222     
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::O  L:::::L                2:::::22222        
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::O  L:::::L               2:::::2             
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O  L:::::L         LLLLLL2:::::2             
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::OLL:::::::LLLLLLLLL:::::L2:::::2       222222
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO L::::::::::::::::::::::L2::::::2222222:::::2
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   L::::::::::::::::::::::L2::::::::::::::::::2
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     LLLLLLLLLLLLLLLLLLLLLLLL22222222222222222222
+--  
+--  DaDam's Engine Of improved Libraries 2 (DEOL2)
+
+--------------------
+
+if SERVER then
+    
+else
+    
+    ---------- Render ----------
+    do
+        -- Exists to restore previous default allignment options
+        local getTextureID = render.getTextureID
+        function render.getTextureID(tx, cb)
+            return getTextureID(tx, function(material, url, width, height, layout)
+                local w, h = math.min(1, width / height), math.min(1, height / width)
+                layout(512 * (1 - w), 512 * (1 - h), 1024 * w, 1024 * h)
+                
+                if cb then
+                    cb(material, url, width, height, layout)
+                end
+            end)
+        end
+    end
+    
+end

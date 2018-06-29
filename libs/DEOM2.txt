@@ -99,7 +99,7 @@ if SERVER then
             local typ = net.readString()
             
             if typ == "t" then
-                rtn = von.deserialize(net.readString())
+                rtn = json.decode(net.readString())
             elseif typ == "s" then
                 rtn = net.readString()
             elseif typ == "n" then
@@ -183,7 +183,7 @@ if SERVER then
         
         if type(data) == "table" then
             net.writeString("t")
-            net.writeString(von.serialize(data))
+            net.writeString(json.encode(data))
         elseif type(data) == "string" then
             net.writeString("s")
             net.writeString(data)
@@ -349,7 +349,7 @@ if CLIENT then
             local typ = net.readString()
             
             if typ == "t" then
-                rtn = von.deserialize(net.readString()) --von.deserialize(net.readString())
+                rtn = json.decode(net.readString()) --json.decode(net.readString())
             elseif typ == "s" then
                 rtn = net.readString()
             elseif typ == "n" then
@@ -432,7 +432,7 @@ if CLIENT then
         
         if type(data) == "table" then
             net.writeString("t")
-            net.writeString(von.serialize(data))
+            net.writeString(json.encode(data))
         elseif type(data) == "string" then
             net.writeString("s")
             net.writeString(data)

@@ -1,7 +1,26 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             GGGGGGGGGGGGG 333333333333333   
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        GGG::::::::::::G3:::::::::::::::33 
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    GG:::::::::::::::G3::::::33333::::::3
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::O  G:::::GGGGGGGG::::G3333333     3:::::3
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O G:::::G       GGGGGG            3:::::3
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OG:::::G                          3:::::3
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OG:::::G                  33333333:::::3 
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OG:::::G    GGGGGGGGGG    3:::::::::::3  
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OG:::::G    G::::::::G    33333333:::::3 
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OG:::::G    GGGGG::::G            3:::::3
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OG:::::G        G::::G            3:::::3
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::O G:::::G       G::::G            3:::::3
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::O  G:::::GGGGGGGG::::G3333333     3:::::3
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO    GG:::::::::::::::G3::::::33333::::::3
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO        GGG::::::GGG:::G3:::::::::::::::33 
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO             GGGGGG   GGGG 333333333333333   
+--  
+--  DaDam's Engine Of GUI (DEOG) A starfall DEOG engine
+
 local gui = {
     elements = {},
-    leftClickButtons = {[107] = true, [15] = true},
-    rightClickButtons = {[108] = true},
+    leftClickButtons = {[107] = true, [15] = true}, --Leftclick and E by default
+    rightClickButtons = {[108] = true}, --Rightclick by default
     doubleClickTime = 0.5,
     visabilityUpdate = 0.1,
     useServerPlayerSay = true
@@ -75,6 +94,17 @@ local defaultMethods = {
                     table.insert(objects, data)
                 end
             end
+        end
+    end,
+    fill = function(self)
+        local data = gui.getCoreData(self)
+        
+        self.pos = Vector(0, 0)
+        
+        if data.parent then
+            self.size = data.parent.size
+        else
+            self.size = Vector(512, 512)
         end
     end
 }
@@ -307,7 +337,7 @@ function gui.registerElement(name, inherit, data)
             end
         end
     else
-        if not gui.elements[inherit] then error("DEOG3: tried to create gui element with invalid inherit type of " .. inherit) end
+        if not gui.elements[inherit] then error("DEOG3: tried to register gui element with invalid inherit type of " .. inherit) end
         
         data.settings = data.settings or {}
         local newdata = table.copy(gui.elements[inherit].coredata)
@@ -502,6 +532,77 @@ end]]
 
 ------------------------------
 
+-----Text-----
+gui.registerElement("text", {
+    settings = {
+        color = Color(50, 50, 50),
+        font = defaultFont,
+        text = "Text",
+        wrap = true,
+        allignmentX = 1,
+        allignmentY = 1,
+        wrapFunction = function(self)
+            local text = ""
+            local line = ""
+            
+            local function doWord(word)
+                local w, h = render.getTextSize(line .. " " .. word)
+                
+                if w > self.size.x then
+                    text = text .. line .. "\n"
+                    line = word
+                else
+                    line = line .. " " .. word
+                end
+            end
+            
+            for k, part in pairs(string.split(self.text, " ")) do
+                local words = string.split(part, "\n")
+                
+                for k, word in pairs(words) do
+                    doWord(word)
+                    
+                    if k < #words then
+                        line = line .. "\n"
+                    end
+                end
+            end
+            
+            if line == "" then
+                text = string.sub(text, 1, #text - 1)
+            else
+                text = text .. line
+            end
+            
+            return text
+        end,
+        draw = function(self, size)
+            render.setColor(self.color)
+            render.setFont(self.font)
+            render.drawText(self.allignmentX == 0 and 0 or (self.allignmentX == 1 and self.size.x/2 or self.size.x), self.allignmentY == 0 and 0 or (self.allignmentY == 1 and self._textOffset or self.size.y - self._textHeight), self._wrappedText, self.allignmentX)
+        end,
+        drawOver = function(self, size) end
+    }, onDraw = function(self)
+        if self.font ~= self._lastFont or self.text ~= self._lastText then
+            if self.wrap then
+                self._wrappedText = self.wrapFunction(self)
+            else
+                self._wrappedText = self.text
+            end
+            
+            local w, h = render.getTextSize(self._wrappedText)
+            
+            self._textOffset = (self.size.y - h) / 2
+            self._textHeight = h
+            self._lastFont = self.font
+            self._lastText = self.text
+        end
+        
+        self.draw(self, self.size)
+        self.drawOver(self, self.size)
+    end
+})
+
 -----Container-----
 gui.registerElement("container", {
     settings = {
@@ -539,6 +640,7 @@ gui.registerElement("frame", "container", {
             render.drawRect(self.borderSize, self.headSize, size.x - self.borderSize*2, size.y - self.borderSize - self.headSize)
             
             render.setColor(self.colorText)
+            render.setFont(self.font)
             render.drawSimpleText(self.size.x/2, self.headSize/2, self.title, 1, 1)
         end,
         drawOver = function(self, size) end
@@ -593,6 +695,7 @@ gui.registerElement("label", "container", {
         colorText = Color(50, 50, 50),
         font = defaultFont,
         text = "Label",
+        textAllignment = 1,
         draw = function(self, size)
             render.setColor(self.colorBorder)
             render.drawRect(0, 0, size.x, size.y)
@@ -602,10 +705,18 @@ gui.registerElement("label", "container", {
             
             render.setColor(self.colorText)
             render.setFont(self.font)
-            render.drawSimpleText(size.x/2, size.y/2, self.text, 1, 1)
+            render.drawSimpleText(self.textAllignment == 0 and self._textOffset or (self.textAllignment == 1 and size.x/2 or size.x - self._textOffset), size.y/2, self.text, self.textAllignment, 1)
         end,
         drawOver = function(self, size) end
     }, onDraw = function(self)
+        if self.font ~= self._lastFont then
+            render.setFont(self.font)
+            local w, h = render.getTextSize(" ")
+            
+            self._textOffset = (self.size.y - h) / 2
+            self._lastFont = self.font
+        end
+        
         self.draw(self, self.size)
         self.drawOver(self, self.size)
     end
@@ -630,7 +741,7 @@ gui.registerElement("button", "label", {
         onHoverBegin = function(self) end,
         onHoverEnd = function(self) end,
         onHover = function(self) end,
-        draw = function(self, size)
+        --[[draw = function(self, size)
             render.setColor(self.colorBorder)
             render.drawRect(0, 0, size.x, size.y)
             
@@ -640,7 +751,7 @@ gui.registerElement("button", "label", {
             render.setColor(self.colorText)
             render.setFont(self.font)
             render.drawSimpleText(size.x/2, size.y/2, self.text, 1, 1)
-        end,
+        end,]]
         drawOver = function(self, size) end
     }, onThink = function(self)
         local lastHover = self.hovering
@@ -656,10 +767,10 @@ gui.registerElement("button", "label", {
             self.onHover(self)
         end
     end,
-    onDraw = function(self)
+    --[[onDraw = function(self)
         self.draw(self, self.size)
         self.drawOver(self, self.size)
-    end,
+    end,]]
     onClick = function(self)
         if self.hovering then
             self.mouseLeftDown = true
@@ -718,6 +829,11 @@ gui.registerElement("buttongrid", "button", {
     }, methods = {
         addButton = function(self, text)
             table.insert(self.buttons, text)
+        end,
+        getOccupiedSpace = function(self)
+            local y = math.ceil(#self.buttons / self.maxX)
+            
+            return Vector(self.maxX * self.buttonSize.x + (self.maxX - 1) * self.spacing.x, y * self.buttonSize.y + (y - 1) * self.spacing.y)
         end
     }, onThink = function(self)
         local lastHover = self.hovering
@@ -833,6 +949,7 @@ gui.registerElement("checkbox", {
         self.label = gui.create("label", self)
         self.label.text = "Checkbox"
         self.label.solid = false
+        self.label.textAllignment = 0
     end,
     onThink = function(self)
         if self.state then
@@ -866,8 +983,6 @@ gui.registerElement("textentry", "label", {
         text = "",
         textEmpty = "textentry",
         selected = false,
-        lastFont = nil, --Used for left side allignment
-        textOffset = 0, --Used for left side allignment
         onClick = function(self) end,
         onChange = function(self, text) end,
         draw = function(self, size)
@@ -880,7 +995,7 @@ gui.registerElement("textentry", "label", {
             local isEmpty = self.text == ""
             render.setColor(isEmpty and Color(self.colorText.r, self.colorText.g, self.colorText.b, 100) or self.colorText)
             render.setFont(self.font)
-            render.drawSimpleText(self.textOffset, size.y/2, isEmpty and self.textEmpty or self.text, 0, 1)
+            render.drawSimpleText(self._textOffset, size.y/2, isEmpty and self.textEmpty or self.text, 0, 1)
             
             if self.selected and math.round(timer.curtime())%2 == 1 then
                 render.setColor(self.colorBorder)
@@ -888,13 +1003,12 @@ gui.registerElement("textentry", "label", {
             end
         end,
     }, onDraw = function(self)
-        if self.font ~= self.lastFont then
-            self.lastFont = self.font
-            
+        if self.font ~= self._lastFont then
             render.setFont(self.font)
             local w, h = render.getTextSize(" ")
             
-            self.textOffset = (self.size.y - h) / 2
+            self._textOffset = (self.size.y - h) / 2
+            self._lastFont = self.font
         end
         
         self.draw(self, self.size)

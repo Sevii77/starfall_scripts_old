@@ -1,0 +1,330 @@
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM 333333333333333   
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M:::::::M             M:::::::M3:::::::::::::::33 
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::::M           M::::::::M3::::::33333::::::3
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEEE::::EO:::::::OOO:::::::OM:::::::::M         M:::::::::M3333333     3:::::3
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::::::M       M::::::::::M            3:::::3
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM:::::::::::M     M:::::::::::M            3:::::3
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM:::::::M::::M   M::::M:::::::M    33333333:::::3 
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M M::::M M::::M M::::::M    3:::::::::::3  
+--    D:::::D     D:::::DE:::::::::::::::E   O:::::O     O:::::OM::::::M  M::::M::::M  M::::::M    33333333:::::3 
+--    D:::::D     D:::::DE::::::EEEEEEEEEE   O:::::O     O:::::OM::::::M   M:::::::M   M::::::M            3:::::3
+--    D:::::D     D:::::DE:::::E             O:::::O     O:::::OM::::::M    M:::::M    M::::::M            3:::::3
+--    D:::::D    D:::::D E:::::E       EEEEEEO::::::O   O::::::OM::::::M     MMMMM     M::::::M            3:::::3
+--  DDD:::::DDDDD:::::DEE::::::EEEEEEEE:::::EO:::::::OOO:::::::OM::::::M               M::::::M3333333     3:::::3
+--  D:::::::::::::::DD E::::::::::::::::::::E OO:::::::::::::OO M::::::M               M::::::M3::::::33333::::::3
+--  D::::::::::::DDD   E::::::::::::::::::::E   OO:::::::::OO   M::::::M               M::::::M3:::::::::::::::33 
+--  DDDDDDDDDDDDD      EEEEEEEEEEEEEEEEEEEEEE     OOOOOOOOO     MMMMMMMM               MMMMMMMM 333333333333333  
+--  
+--  DaDam's Engine Of Multiplayer 3 (DEOM3) A 2d starfall multiplayer/networking engine
+
+------------------------------
+
+--[[
+    Documentation:
+    
+    Returned table when including contains the following variables:
+        - streamByteReserve (default 500)
+        - streamMinByteSize (default 500)
+        - types (table containing all networkable types)
+    
+    
+    
+    functions:
+    
+    deom.sendData(string name, any data)
+        - Sends the given data to the other side, receivable by deom.receiveData
+    
+    deom.receiveData(string name, function callback)
+        - Used to receive data, callback will be called if data is received with the same name it was send with using deom.sendData
+    
+    deom.sendStream(string name, string/table data)
+        - Used to send long tables or strings, receivable by deom.receiveStream
+        - Returns a StreamSend structure
+    
+    deom.receiveStream(string name, function callbackFinished, function callbackStarted)
+        - Used to receive streams, callbacks will be called if the stream send has the same name it was send with using deom.sendStream
+        - callbackStarted will be called once a stream has started being send, arguments: StreamReceive structure
+    
+    
+    StreamSend structure:
+        - done (amount of bytes that have been send)
+        - size (total size of the stream)
+    
+    StreamReceive structure:
+        - received (amount of bytes that have been received)
+        - size (total size of the stream)
+]]
+
+local deom = {
+    streamByteReserve = 500,
+    streamMinByteSize = 500,
+    types = {
+        number = {
+            write = function(number)
+                net.writeInt(number, 32)
+            end,
+            read = function()
+                return net.readInt(32)
+            end
+        }, string = {
+            write = function(string)
+                net.writeInt(#string, 32)
+                net.writeData(string, #string)
+            end,
+            read = function()
+                return net.readData(net.readInt(32))
+            end
+        }, boolean = {
+            write = function(bool)
+                net.writeBit(bool)
+            end,
+            read = function()
+                return net.readBit() == 1
+            end
+        }, table = {
+            write = function(tbl)
+                local string = fastlz.compress(json.encode(tbl))
+                
+                net.writeInt(#string, 32)
+                net.writeData(string, #string)
+            end,
+            read = function()
+                return json.decode(fastlz.decompress(net.readData(net.readInt(32))))
+            end
+        }, Color = {
+            write = function(clr)
+                net.writeColor(clr)
+            end,
+            read = function()
+                return net.readColor()
+            end
+        }, Vector = {
+            write = function(vec)
+                net.writeVector(vec)
+            end,
+            read = function()
+                return net.readVector()
+            end
+        }, Angle = {
+            write = function(ang)
+                net.writeAngle(ang)
+            end,
+            read = function()
+                return net.readAngle()
+            end
+        }, Entity = {
+            write = function(ent)
+                net.writeInt(ent:entIndex(), 32)
+            end,
+            read = function()
+                return entity(net.readInt(32))
+            end
+        }, Player = {
+            write = function(ply)
+                net.writeInt(ply:getUniqueID(), 32)
+            end,
+            read = function()
+                local id = net.readInt(32)
+                
+                for k, ply in pairs(find.allPlayers()) do
+                    if ply:getUniqueID() == id then
+                        return ply
+                    end
+                end
+            end
+        }
+    }
+}
+
+--local networknames = {}
+local idtypes = {}
+local receives = {}
+local streams = {
+    send = {},
+    receive = {}
+}
+
+------------------------------
+
+local i = -32
+for k, v in pairs(deom.types) do
+    v.id = i
+    idtypes[v.id] = k
+    
+    i = i + 1
+end
+
+--[[net.receive("deom_nn", function()
+
+end)]]
+
+------------------------------
+
+net.receive("deom", function(length, ply)
+    local name = net.readString()
+    
+    if not receives[name] then return end
+    
+    receives[name](deom.types[idtypes[net.readInt(6)]].read(), ply)
+end)
+
+function deom.sendData(name, data, target)
+    local typ = type(data)
+    
+    if not deom.types[typ] then
+        error("DEOM3: Tried to network object with invalid type (" .. typ .. ")")
+    end
+    
+    --[[if not networknames[name] then
+        networknames[name] = table.count(networknames)
+        
+        net.start("deom_nn")
+        
+        net.writeString(name)
+        net.writeInt(networknames[name], 32)
+        
+        net.send()
+    end]]
+    
+    net.start("deom")
+    
+    --net.writeInt(networknames[name], 32)
+    net.writeString(name)
+    net.writeInt(deom.types[typ].id, 6)
+    deom.types[typ].write(data)
+    
+    net.send(target)
+end
+
+function deom.receiveData(name, callback)
+    receives[name] = callback
+end
+
+------------------------------
+
+net.receive("deom_ss", function(length, ply)
+    local name = net.readString()
+    local str = streams.receive[name]
+    
+    if not str then return end
+    
+    str.isTable = net.readBit() == 1
+    
+    local Stream = {}
+    Stream.__index = Stream
+    
+    local stream = setmetatable({}, Stream)
+    stream.received = 0
+    stream.size = net.readInt(32)
+    
+    str.size = stream.size
+    str.stream = stream
+    
+    if str.callbackStarted then
+        str.callbackStarted(stream)
+    end
+end)
+
+net.receive("deom_s", function(length, ply)
+    local name = net.readString()
+    local str = streams.receive[name]
+    
+    if not str then return end
+    
+    local size = net.readInt(32)
+    str.received = str.received + size
+    str.stream.received = str.received
+    str.data = str.data .. net.readData(size)
+    
+    if str.received == str.size then
+        local data = str.data
+        
+        if str.isTable then
+            data = json.decode(fastlz.decompress(data))
+        end
+        
+        str.callbackFinished(data)
+        str.data = ""
+        str.received = 0
+        str.size = 0
+        str.isTable = false
+        str.stream = nil
+    end
+end)
+
+hook.add("think", "deom_s", function()
+    while #streams.send > 0 and net.getBytesLeft() > deom.streamByteReserve + deom.streamMinByteSize do
+        local str = streams.send[1]
+        local size = math.min(#str.data, net.getBytesLeft() - deom.streamByteReserve)
+        
+        net.start("deom_s")
+        
+        net.writeString(str.name)
+        net.writeInt(size, 32)
+        net.writeData(str.data, size)
+        
+        net.send(str.target)
+        
+        
+        str.data = string.sub(str.data, size + 1)
+        str.stream.done = str.stream.done + size
+        
+        if #str.data == 0 then
+            str.stream = nil
+            
+            table.remove(streams.send, 1)
+        end
+    end
+end)
+
+function deom.sendStream(name, data, target)
+    local typ = type(data)
+    
+    if typ == "table" then
+        data = fastlz.compress(json.encode(data))
+    elseif typ ~= "string" then
+        error("DEOM3: Tried to stream data with invalid type (" .. typ .. ")")
+    end
+    
+    local Stream = {}
+    Stream.__index = Stream
+    
+    local stream = setmetatable({}, Stream)
+    stream.done = 0
+    stream.size = #data
+    
+    table.insert(streams.send, {
+        name = name,
+        data = data,
+        target = target,
+        stream = stream
+    })
+    
+    
+    net.start("deom_ss")
+    
+    net.writeString(name)
+    net.writeBit(typ == "table")
+    net.writeInt(#data, 32)
+    
+    net.send(target)
+    
+    return stream
+end
+
+function deom.receiveStream(name, callbackFinished, callbackStarted)
+    streams.receive[name] = {
+        callbackFinished = callbackFinished,
+        callbackStarted = callbackStarted,
+        data = "",
+        received = 0,
+        size = 0,
+        isTable = false,
+        stream = nil
+    }
+end
+
+------------------------------
+
+return deom
+

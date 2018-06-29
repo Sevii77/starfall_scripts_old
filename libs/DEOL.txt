@@ -475,7 +475,7 @@ if CLIENT then
     -- on success: 1. texture table
     --             * and calls callback when texture is ready
     -- on failure: 1. nil
-    local textureCache = {} --[url] = {lastUsed=lastUsed, tx=tx, ready=ready}
+    --[==[local textureCache = {} --[url] = {lastUsed=lastUsed, tx=tx, ready=ready}
     function render.getTextureIDCached(url, cb, align, skip_hack)
         local cached = textureCache[url]
         if cached then --if texture is in cache, we may immediately return it
@@ -530,6 +530,59 @@ if CLIENT then
         end
         
         return nil
+    end]==]
+    
+    local renderSetTexture = render.setTexture
+    function render.setTexture(texture)
+        if type(texture) ~= "table" then
+            t = texture
+        end
+        
+        renderSetTexture(t)
+    end
+    
+    local textureCache = {}
+    function render.getTextureIDCached(url, ...)
+        if textureCache[url] then
+            textureCache[url].lastUsed = timer.curtime()
+            
+            return textureCache[url].texture
+        end
+        
+        local success, texture = pcall(render.getTextureID, url, ...)
+        if success then
+            textureCache[url] = {
+                texture = texture,
+                lastUsed = timer.curtime()
+            }
+            
+            return texture
+        end
+        
+        local sorted = {}
+        for k, v in pairs(textureCache) do
+            table.insert(sorted, {
+                url = k,
+                texture = v.texture,
+                lastUsed = v.lastUsed
+            })
+        end
+        table.sortByMember(sorted, "lastUsed", true)
+        
+        for k, v in pairs(sorted) do
+            local success, texture = pcall(render.getTextureID, url, ...)
+            if success then
+                textureCache[url] = {
+                    texture = texture,
+                    lastUsed = timer.curtime()
+                }
+                
+                return texture
+            end
+            
+            render.destroyTexture(v.texture)
+            textureCache[v.url] = nil
+        end
     end
 end
 

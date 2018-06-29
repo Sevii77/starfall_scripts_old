@@ -331,7 +331,13 @@ function DEOV.registerSprites(url, data, texture)
     end
     
     if not DEOV.textures[url] then
-        DEOV.textures[url] = texture or render.getTextureID(url, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+        DEOV.textures[url] = texture or render.getTextureID(url, function(material, url, width, height, layout)
+            DEOV.texturesLoading = DEOV.texturesLoading - 1
+            
+            local w, h = math.min(1, width / height), math.min(1, height / width)
+            layout(512 * (1 - w), 512 * (1 - h), 1024 * w, 1024 * h)
+        end)
+        
         DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
     end
 end
@@ -345,7 +351,13 @@ function DEOV.registerSprite(url, name, uv1, uv2, texture)
     }
     
     if not DEOV.textures[url] then
-        DEOV.textures[url] = texture or render.getTextureID(url, function() DEOV.texturesLoading = DEOV.texturesLoading - 1 end)
+        DEOV.textures[url] = texture or render.getTextureID(url, function(material, url, width, height, layout)
+            DEOV.texturesLoading = DEOV.texturesLoading - 1
+            
+            local w, h = math.min(1, width / height), math.min(1, height / width)
+            layout(512 * (1 - w), 512 * (1 - h), 1024 * w, 1024 * h)
+        end)
+        
         DEOV.texturesLoading = DEOV.texturesLoading + (texture and 0 or 1)
     end
 end
