@@ -26,6 +26,7 @@ local gui = {
     useServerPlayerSay = true
 }
 
+local net = net
 
 if SERVER then
     if net.dataReceive then
@@ -61,8 +62,6 @@ local buttonsDown = {
     TODO:
     
     add arrows to scrollbar
-    add panel textentry
-    add panel scrollregion
 ]]
 
 local defaultFont = render.createFont("roboto", 18, 800)
@@ -437,7 +436,11 @@ function gui.create(typ, parent)
     end]]
     
     for name, v in pairs(gui.elements[typ].settings) do
-        data.panel[name] = v
+        if type(v) ~= "table" then
+            data.panel[name] = v
+        else
+            data.panel[name] = table.copy(v)
+        end
     end
     
     function data.panel:remove()
@@ -486,8 +489,10 @@ function gui.render()
     local function renderObject(obj, offset)
         if not obj.panel.enabled or not obj.panel.onScreen then return end
         
+        local pos = offset + obj.panel.pos
         local matrix = Matrix()
-        matrix:setTranslation(offset + obj.panel.pos)
+        matrix:setTranslation(Vector(pos.x, pos.y))
+        
         render.pushMatrix(matrix)
             gui.elements[obj.typ].functions.onDraw(obj.panel)
         render.popMatrix(matrix)
@@ -590,6 +595,7 @@ gui.registerElement("text", {
                 self._wrappedText = self.text
             end
             
+            render.setFont(self.font)
             local w, h = render.getTextSize(self._wrappedText)
             
             self._textOffset = (self.size.y - h) / 2
@@ -765,6 +771,14 @@ gui.registerElement("button", "label", {
             end
         elseif self.hovering then
             self.onHover(self)
+        end
+        
+        if self.mouseLeftDown then
+            self.onHold(self)
+        end
+        
+        if self.mouseRightDown then
+            self.onRightHold(self)
         end
     end,
     --[[onDraw = function(self)
@@ -1080,7 +1094,63 @@ gui.registerElement("slider", "label", {
             
             local old = self.value
             
-            self.value = math.round(math.clamp((cursor.x - self.size.y/2) / (self.size.x - self.size.y) * (self.max - self.min) + self.min, self.min, self.max) / self.round) * self.round
+            self.value = math.clamp(math.round(((cursor.x - self.size.y/2) / (self.size.x - self.size.y) * (self.max - self.min) + self.min) / self.round) * self.round, self.min, self.max)
+            
+            if old ~= self.value then
+                self.onChange(self, self.value)
+            end
+        end
+    end,
+    onDraw = function(self)
+        self.draw(self, self.size)
+        self.drawOver(self, self.size)
+    end,
+    onClick = function(self)
+        if gui.isCursorOnPanel(self) then
+            self.holding = true
+        end
+    end,
+    onRelease = function(self)
+        self.holding = false
+    end
+})
+
+-----Box Slider-----
+gui.registerElement("boxslider", "label", {
+    settings = {
+        colorOn = Color(30, 255, 110),
+        colorOff = Color(190, 60, 30),
+        size = Vector(100, 20),
+        round = 1,
+        holding = false,
+        value = 0,
+        min = 0,
+        max = 1,
+        onChange = function(self, value) end,
+        draw = function(self, size)
+            render.setColor(self.colorBorder)
+            render.drawRect(0, 0, size.x, size.y)
+            
+            render.setColor(self.color)
+            render.drawRect(self.borderSize, self.borderSize, size.x - self.borderSize*2, size.y - self.borderSize*2)
+            
+            local valueScale = (self.value + math.abs(self.min)) / (self.max - self.min)
+            render.setColor(self.colorOn)
+            render.drawRect(self.borderSize, self.borderSize, (size.x - self.borderSize*2) * valueScale, size.y - self.borderSize*2)
+            
+            render.setColor(self.colorOff)
+            render.drawRect(self.borderSize + (size.x - self.borderSize*2) * valueScale, self.borderSize, math.ceil((size.x - self.borderSize*2) * (1 - valueScale)), size.y - self.borderSize*2)
+        end,
+        drawOver = function(self, size) end
+    }, onThink = function(self)
+        if self.holding then
+            local cursor = gui.getCursorPos(self)
+            
+            if cursor.x == -1 then return end
+            
+            local old = self.value
+            
+            self.value = math.clamp(math.round((cursor.x / self.size.x * (self.max - self.min) + self.min) / self.round) * self.round, self.min, self.max)
             
             if old ~= self.value then
                 self.onChange(self, self.value)
